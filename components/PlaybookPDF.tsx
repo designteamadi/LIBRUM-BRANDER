@@ -20,31 +20,24 @@ import type {
 import { archetypeByKey } from "@/lib/archetypes";
 
 Font.register({
-  family: "Instrument Serif",
+  family: "Highrise",
   fonts: [
-    {
-      src: "https://fonts.gstatic.com/s/instrumentserif/v4/jizDREVItHgc8qDIbSTKq4XKVjGV1bm-jvgjhA.ttf",
-      fontWeight: 400,
-    },
-    {
-      src: "https://fonts.gstatic.com/s/instrumentserif/v4/jizGREVItHgc8qDIbSTKq4XKVjPdL1xkv4HQjBg.ttf",
-      fontWeight: 400,
-      fontStyle: "italic",
-    },
+    { src: "/fonts/Highrise-Regular.woff2", fontWeight: 400 },
+    { src: "/fonts/Highrise-Bold.woff2", fontWeight: 700 },
   ],
 });
 
 Font.register({
-  family: "Inter",
+  family: "AdelleSans",
   fonts: [
-    {
-      src: "https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.ttf",
-      fontWeight: 400,
-    },
-    {
-      src: "https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIa0ZL7.ttf",
-      fontWeight: 500,
-    },
+    { src: "/fonts/AdelleSans-Light.woff2", fontWeight: 300 },
+    { src: "/fonts/AdelleSans-LightItalic.woff2", fontWeight: 300, fontStyle: "italic" },
+    { src: "/fonts/AdelleSans-Regular.woff2", fontWeight: 400 },
+    { src: "/fonts/AdelleSans-RegularItalic.woff2", fontWeight: 400, fontStyle: "italic" },
+    { src: "/fonts/AdelleSans-Semibold.woff2", fontWeight: 600 },
+    { src: "/fonts/AdelleSans-SemiboldItalic.woff2", fontWeight: 600, fontStyle: "italic" },
+    { src: "/fonts/AdelleSans-Bold.woff2", fontWeight: 700 },
+    { src: "/fonts/AdelleSans-BoldItalic.woff2", fontWeight: 700, fontStyle: "italic" },
   ],
 });
 
@@ -64,14 +57,14 @@ const styles = StyleSheet.create({
   page: {
     backgroundColor: COLORS.navy,
     color: COLORS.bone,
-    fontFamily: "Inter",
+    fontFamily: "AdelleSans",
     padding: 56,
     fontSize: 10,
   },
   pageWhite: {
     backgroundColor: COLORS.bone,
     color: COLORS.noir,
-    fontFamily: "Inter",
+    fontFamily: "AdelleSans",
     padding: 56,
     fontSize: 10,
   },
@@ -104,18 +97,18 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   hero: {
-    fontFamily: "Instrument Serif",
+    fontFamily: "Highrise",
     fontSize: 72,
     lineHeight: 0.95,
     marginBottom: 14,
   },
   heroAccent: {
-    fontFamily: "Instrument Serif",
+    fontFamily: "Highrise",
     fontStyle: "italic",
     color: COLORS.spark,
   },
   sectionTitle: {
-    fontFamily: "Instrument Serif",
+    fontFamily: "Highrise",
     fontSize: 38,
     lineHeight: 1,
     marginBottom: 24,
@@ -158,7 +151,7 @@ const styles = StyleSheet.create({
   },
   essenceTitle: {
     fontSize: 16,
-    fontFamily: "Instrument Serif",
+    fontFamily: "Highrise",
     color: COLORS.bone,
     marginBottom: 4,
   },
@@ -247,7 +240,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
           {props.tagline ? (
             <Text
               style={{
-                fontFamily: "Instrument Serif",
+                fontFamily: "Highrise",
                 fontStyle: "italic",
                 fontSize: 28,
                 marginTop: 14,
@@ -325,7 +318,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
         <View style={styles.divider} />
         <Text
           style={{
-            fontFamily: "Inter",
+            fontFamily: "AdelleSans",
             fontSize: 13,
             lineHeight: 1.7,
             color: COLORS.bone,
@@ -413,7 +406,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
             <Text style={styles.eyebrow}>display · {props.type.display}</Text>
             <Text
               style={{
-                fontFamily: "Instrument Serif",
+                fontFamily: "Highrise",
                 fontSize: 80,
                 lineHeight: 0.95,
                 marginTop: 8,
@@ -423,7 +416,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
             </Text>
             <Text
               style={{
-                fontFamily: "Instrument Serif",
+                fontFamily: "Highrise",
                 fontSize: 40,
                 lineHeight: 1.05,
                 marginTop: 4,
@@ -436,7 +429,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
             <Text style={styles.eyebrow}>body · {props.type.body}</Text>
             <Text
               style={{
-                fontFamily: "Inter",
+                fontFamily: "AdelleSans",
                 fontSize: 11,
                 lineHeight: 1.6,
                 marginTop: 8,
@@ -537,7 +530,7 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
           </Text>
           <Text
             style={{
-              fontFamily: "Instrument Serif",
+              fontFamily: "Highrise",
               fontStyle: "italic",
               fontSize: 22,
               marginTop: 14,
@@ -641,7 +634,7 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
           <Text
             key={i}
             style={{
-              fontFamily: "Instrument Serif",
+              fontFamily: "Highrise",
               fontSize: 30,
               lineHeight: 1.1,
               marginBottom: 14,
@@ -655,7 +648,7 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
         <Text style={styles.eyebrow}>cta</Text>
         <Text
           style={{
-            fontFamily: "Instrument Serif",
+            fontFamily: "Highrise",
             fontSize: 38,
             color: COLORS.spark,
             marginTop: 6,
@@ -707,7 +700,7 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
             <Text style={styles.eyebrow}>display · {props.type.display}</Text>
             <Text
               style={{
-                fontFamily: "Instrument Serif",
+                fontFamily: "Highrise",
                 fontSize: 80,
                 lineHeight: 0.95,
                 marginTop: 8,
@@ -720,7 +713,7 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
             <Text style={styles.eyebrow}>body · {props.type.body}</Text>
             <Text
               style={{
-                fontFamily: "Inter",
+                fontFamily: "AdelleSans",
                 fontSize: 11,
                 lineHeight: 1.6,
                 marginTop: 8,
