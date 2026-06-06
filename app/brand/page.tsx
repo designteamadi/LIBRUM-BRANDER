@@ -1,13 +1,14 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import StepShell from "@/components/StepShell";
-import ArchetypePoster from "@/components/ArchetypePoster";
+import ArchetypePicker from "@/components/ArchetypePicker";
 import TonePicker from "@/components/TonePicker";
 import LogoStylePicker from "@/components/LogoStylePicker";
 import LanguagePicker from "@/components/LanguagePicker";
 import PalettePicker from "@/components/PalettePicker";
 import TypePicker from "@/components/TypePicker";
+import RefineBar from "@/components/RefineBar";
 import { useBRND } from "@/lib/store";
 import { archetypeByKey } from "@/lib/archetypes";
 import type {
@@ -15,7 +16,6 @@ import type {
   TypePairing,
   Persona,
   GeneratedBrand,
-  EssenceItem,
 } from "@/lib/types";
 
 const TOTAL = 8;
@@ -26,11 +26,8 @@ type Suggestions = {
   taglines: string[];
   story: string;
   patternIdea: string;
-  essence: EssenceItem[];
-  iconLabels: string[];
   conceptThumbnailPrompts: string[];
   mockupPrompts: string[];
-  moodboardPrompts: string[];
 };
 
 export default function BrandFlow() {
@@ -38,13 +35,32 @@ export default function BrandFlow() {
   const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestions | null>(null);
-  const [live, setLive] = useState(false);
   const [thumbnailsLoading, setThumbnailsLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [selectedPalette, setSelectedPalette] = useState<ColorPalette | null>(
     null
   );
   const [selectedType, setSelectedType] = useState<TypePairing | null>(null);
+
+  // User-visible error from a failing /api/reason call. Cleared at the
+  // start of each new fetch. Surfaced inline on the step that triggered it.
+  const [genError, setGenError] = useState<string | null>(null);
+
+  // ---------- Refinement state (steps 6 & 7) ----------
+  const [paletteNote, setPaletteNote] = useState("");
+  const [paletteRegenBusy, setPaletteRegenBusy] = useState(false);
+  const [paletteRegenError, setPaletteRegenError] = useState<string | null>(
+    null
+  );
+  const [typeNote, setTypeNote] = useState("");
+  const [typeRegenBusy, setTypeRegenBusy] = useState(false);
+  const [typeRegenError, setTypeRegenError] = useState<string | null>(null);
+
+  // Monotonically-increasing counter used to detect stale async operations.
+  // Every fetchSuggestions / regeneratePalettes / regenerateTypography
+  // call increments this and captures its sequence number. When the call
+  // returns, it bails if the counter has moved on (meaning a newer op has
+  // started and the response would clobber fresh state).
+  const opSeqRef = useRef(0);
 
   const {
     brand,
@@ -60,160 +76,334 @@ export default function BrandFlow() {
   const next = () => setStep((s) => Math.min(TOTAL, s + 1));
   const back = () => setStep((s) => Math.max(1, s - 1));
 
-  const fetchSuggestions = async () => {
+  // Fetch the initial creative suggestions on the way into step 6.
+  // Returns true on success so the caller can decide whether to advance.
+  const fetchSuggestions = async (): Promise<boolean> => {
+    const seq = ++opSeqRef.current;
     setBusy(true);
+    setGenError(null);
     try {
       const res = await fetch("/api/reason", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ kind: "brand-suggestions", input: brand }),
       });
-      const json = (await res.json()) as { data: Suggestions; mocked: boolean };
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      const json = (await res.json()) as {
+        data?: Suggestions;
+        error?: string;
+      };
+      // If a newer op has started while we waited, drop this result.
+      if (seq !== opSeqRef.current) return false;
+      if (json.error) throw new Error(json.error);
+      if (
+        !json.data?.palettes?.length ||
+        !json.data?.typography?.length
+      ) {
+        throw new Error("Incomplete suggestions returned");
+      }
       setSuggestions(json.data);
-      setLive(!json.mocked);
-      setSelectedPalette(json.data.palettes?.[0] ?? null);
-      setSelectedType(json.data.typography?.[0] ?? null);
+      setSelectedPalette(json.data.palettes[0] ?? null);
+      setSelectedType(json.data.typography[0] ?? null);
+      return true;
+    } catch (e) {
+      if (seq !== opSeqRef.current) return false;
+      setGenError(
+        e instanceof Error
+          ? `Couldn't generate suggestions — ${e.message}`
+          : "Couldn't generate suggestions"
+      );
+      return false;
     } finally {
-      setBusy(false);
+      if (seq === opSeqRef.current) setBusy(false);
     }
   };
 
-  // Generate thumbnails when palettes update
+  // Concept-thumbnail generation. Stale-result guarded both by the
+  // expectedKey check (prompts changed mid-flight) and by the fact that
+  // setSuggestions(prev => ...) reads the latest state synchronously.
   useEffect(() => {
     if (!suggestions || !suggestions.conceptThumbnailPrompts) return;
     if (suggestions.palettes.every((p) => p.conceptImageDataUrl)) return;
 
-    const needsThumb = suggestions.palettes
-      .map((p, i) => ({ p, i }))
-      .filter((x) => !x.p.conceptImageDataUrl);
-    if (needsThumb.length === 0) return;
-
+    const expectedKey = suggestions.conceptThumbnailPrompts.join("|");
     setThumbnailsLoading(true);
+    const prompts = suggestions.conceptThumbnailPrompts.slice(0, 3);
+
     Promise.all(
-      needsThumb.map(({ i }) => {
-        const prompt = suggestions.conceptThumbnailPrompts[i];
-        if (!prompt) return Promise.resolve({ dataUrl: undefined });
-        return fetch("/api/image", {
+      prompts.map((p) =>
+        fetch("/api/image", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt, aspectRatio: "4:3" }),
+          body: JSON.stringify({ prompt: p, aspectRatio: "4:5" }),
         })
           .then((r) => r.json())
-          .catch(() => ({ dataUrl: undefined }));
-      })
+          .catch(() => ({ dataUrl: undefined }))
+      )
     )
       .then((results) => {
         setSuggestions((prev) => {
           if (!prev) return prev;
-          const palettes = [...prev.palettes];
-          needsThumb.forEach(({ i }, k) => {
-            palettes[i] = {
-              ...palettes[i],
-              conceptImageDataUrl: results[k]?.dataUrl ?? palettes[i].conceptImageDataUrl,
-            };
-          });
-          return { ...prev, palettes };
+          if (prev.conceptThumbnailPrompts.join("|") !== expectedKey) {
+            return prev;
+          }
+          return {
+            ...prev,
+            palettes: prev.palettes.map((p, i) => ({
+              ...p,
+              conceptImageDataUrl:
+                results[i]?.dataUrl ?? p.conceptImageDataUrl,
+            })),
+          };
         });
       })
       .finally(() => setThumbnailsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suggestions?.palettes.length, suggestions?.conceptThumbnailPrompts?.join("|")]);
+  }, [suggestions?.conceptThumbnailPrompts?.join("|")]);
 
-  const handleLoadMore = async () => {
-    if (!suggestions) return;
-    setLoadingMore(true);
+  // ---------- Regenerate palettes & directions (step 6) ----------
+  const regeneratePalettes = async () => {
+    if (paletteRegenBusy) return;
+    const seq = ++opSeqRef.current;
+    setPaletteRegenBusy(true);
+    setPaletteRegenError(null);
     try {
       const res = await fetch("/api/reason", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          kind: "more-brand-palettes",
+          kind: "brand-palettes",
           input: brand,
-          existing: suggestions.palettes,
+          note: paletteNote.trim() || undefined,
         }),
       });
-      const json = await res.json();
-      const more: {
-        palettes: ColorPalette[];
-        conceptThumbnailPrompts: string[];
-      } = json.data;
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      const json = (await res.json()) as {
+        data?: {
+          palettes: ColorPalette[];
+          conceptThumbnailPrompts?: string[];
+        };
+        error?: string;
+      };
+      if (seq !== opSeqRef.current) return;
+      if (json.error || !json.data?.palettes?.length) {
+        throw new Error(json.error || "No palettes returned");
+      }
+      const { palettes, conceptThumbnailPrompts } = json.data;
+      // Strip any thumbnails from incoming palettes so the existing useEffect
+      // will fetch fresh ones for the new directions.
+      const fresh = palettes.map((p) => ({
+        ...p,
+        conceptImageDataUrl: undefined,
+      }));
+      // If Gemini omitted conceptThumbnailPrompts (or returned a wrong-length
+      // array), synthesize fallback prompts from the new palette names. This
+      // GUARANTEES the thumbnail useEffect's dependency changes so new
+      // thumbnails are fetched — without this, the new palettes would show
+      // "preview unavailable" forever.
+      const safePrompts =
+        conceptThumbnailPrompts &&
+        conceptThumbnailPrompts.length === fresh.length
+          ? conceptThumbnailPrompts
+          : fresh.map(
+              (p) =>
+                `Cinematic editorial hero composition representing ${brand.businessName} in the ${p.name} direction — ${p.rationale}`
+            );
       setSuggestions((prev) => {
         if (!prev) return prev;
+        if (seq !== opSeqRef.current) return prev;
         return {
           ...prev,
-          palettes: [...prev.palettes, ...more.palettes],
-          conceptThumbnailPrompts: [
-            ...prev.conceptThumbnailPrompts,
-            ...more.conceptThumbnailPrompts,
-          ],
+          palettes: fresh,
+          conceptThumbnailPrompts: safePrompts,
         };
       });
+      setSelectedPalette(fresh[0] ?? null);
+    } catch (e) {
+      if (seq !== opSeqRef.current) return;
+      setPaletteRegenError(
+        e instanceof Error
+          ? `Couldn't regenerate directions — ${e.message}`
+          : "Couldn't regenerate directions"
+      );
     } finally {
-      setLoadingMore(false);
+      if (seq === opSeqRef.current) setPaletteRegenBusy(false);
     }
   };
 
-  const finalize = async () => {
-    if (!selectedPalette || !selectedType || !suggestions) return;
-    setBusy(true);
-    setMode("brand");
+  // ---------- Regenerate typography (step 7) ----------
+  const regenerateTypography = async () => {
+    if (typeRegenBusy) return;
+    const seq = ++opSeqRef.current;
+    setTypeRegenBusy(true);
+    setTypeRegenError(null);
     try {
-      // 1. Persona
-      const personaRes = await fetch("/api/reason", {
+      const res = await fetch("/api/reason", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          kind: "brand-persona",
+          kind: "brand-typography",
           input: brand,
-          palette: selectedPalette,
+          note: typeNote.trim() || undefined,
         }),
       });
-      const personaJson = await personaRes.json();
-      const persona = personaJson.data as Persona;
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      const json = (await res.json()) as {
+        data?: { typography: TypePairing[] };
+        error?: string;
+      };
+      if (seq !== opSeqRef.current) return;
+      if (json.error || !json.data?.typography?.length) {
+        throw new Error(json.error || "No typography returned");
+      }
+      const { typography } = json.data;
+      setSuggestions((prev) => {
+        if (!prev) return prev;
+        if (seq !== opSeqRef.current) return prev;
+        return { ...prev, typography };
+      });
+      setSelectedType(typography[0] ?? null);
+    } catch (e) {
+      if (seq !== opSeqRef.current) return;
+      setTypeRegenError(
+        e instanceof Error
+          ? `Couldn't regenerate typography — ${e.message}`
+          : "Couldn't regenerate typography"
+      );
+    } finally {
+      if (seq === opSeqRef.current) setTypeRegenBusy(false);
+    }
+  };
 
-      // 2. Logo
-      const logoPrompt = `Studio brand logo for "${brand.businessName}". Style: ${brand.logoStyle}. ${brand.logoPrompt}. Clean, modern, flat, on a plain white background, centered. High contrast, premium feel.`;
-      const logoRes = await fetch("/api/image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: logoPrompt, aspectRatio: "1:1" }),
-      }).then((r) => r.json());
-      const logoForComposite = logoRes?.dataUrl;
+  // Generate the persona, logo, and mockups, then go to /result.
+  // Surfaces failures inline instead of silently swallowing them.
+  const finalize = async () => {
+    if (!selectedPalette || !selectedType || !suggestions) return;
+    setBusy(true);
+    setGenError(null);
+    setMode("brand");
+    // eslint-disable-next-line no-console
+    console.log("[finalize] start", {
+      businessName: brand.businessName,
+      palette: selectedPalette.name,
+      type: `${selectedType.display}/${selectedType.body}`,
+    });
+    try {
+      // -------- Stage 1 (parallel, no inter-deps): persona + logo --------
+      // The persona is text (fast); the logo is an image (slow). They have
+      // no dependencies on each other so we kick both off together.
+      const logoPrompt = `Studio brand logo for "${brand.businessName}". Style: ${brand.logoStyle}. ${brand.logoPrompt}. Clean, modern, on a plain background, suitable as a brand mark. Premium feel.`;
 
-      // 3. Mockups + moodboard in parallel
-      const mockupPrompts = (suggestions.mockupPrompts || []).slice(0, 3);
-      const moodPrompts = (suggestions.moodboardPrompts || []).slice(0, 6);
-
-      const [mockResults, moodResults] = await Promise.all([
-        Promise.all(
-          mockupPrompts.map((p, i) =>
-            fetch("/api/image", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                prompt: logoForComposite
-                  ? `${p}\n\nIMPORTANT: Apply the brand logo from the provided image naturally onto the visible product/surface/sign in this scene — preserve its proportions; match the lighting and perspective.`
-                  : p,
-                aspectRatio: i === 0 ? "4:5" : "1:1",
-                inputImages: logoForComposite ? [logoForComposite] : undefined,
-              }),
-            }).then((r) => r.json())
-          )
-        ),
-        Promise.all(
-          moodPrompts.map((p) =>
-            fetch("/api/image", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ prompt: p, aspectRatio: "1:1" }),
-            }).then((r) => r.json())
-          )
-        ),
+      const [personaRes, logoRes] = await Promise.all([
+        fetch("/api/reason", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            kind: "brand-persona",
+            input: brand,
+            palette: selectedPalette,
+          }),
+        }),
+        fetch("/api/image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: logoPrompt, aspectRatio: "1:1" }),
+        })
+          .then((r) => r.json())
+          .catch(() => ({ dataUrl: undefined })),
       ]);
+
+      if (!personaRes.ok) {
+        throw new Error(`Persona service returned ${personaRes.status}`);
+      }
+      const personaJson = (await personaRes.json()) as {
+        data?: Partial<Persona>;
+        error?: string;
+      };
+      // Persona must have name + description + traits[] for the Bento to
+      // render without crashing. If ANY field is missing or malformed,
+      // synthesize a fallback from the brand inputs rather than throw —
+      // we'd rather ship an imperfect persona than fail to render the result.
+      const d = personaJson.data;
+      const validPersona =
+        d &&
+        typeof d.name === "string" &&
+        d.name.trim().length > 0 &&
+        typeof d.description === "string" &&
+        d.description.trim().length > 0 &&
+        Array.isArray(d.traits) &&
+        d.traits.length > 0 &&
+        d.traits.every((t) => typeof t === "string");
+      const persona: Persona = validPersona
+        ? (d as Persona)
+        : {
+            name: brand.businessName || "The Brand",
+            description:
+              brand.description ||
+              brand.mission ||
+              `A brand built around ${brand.toneKeywords.join(", ") || "honest craft"}.`,
+            traits:
+              brand.toneKeywords.length > 0
+                ? brand.toneKeywords.slice(0, 5)
+                : ["considered", "deliberate", "honest", "warm", "specific"],
+          };
+      if (!validPersona) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          "[finalize] persona response was malformed; using synthetic fallback",
+          { received: personaJson }
+        );
+      }
+
+      // -------- Stage 2 (parallel, depends on logo): 6 categorized mockups
+      //   slot 0: HERO         9:16
+      //   slot 0: HERO          9:16
+      //   slot 1: SOCIAL        1:1
+      //   slot 2: POSTER        2:3
+      //   slot 3: OOH/BILLBOARD 16:9
+      //   slot 4: COLLATERAL    4:3
+      //   slot 5: PHOTOGRAPHY   1:1
+      //   slot 6: EDITORIAL BANNER 16:9   (new — wide marquee web/print banner)
+      //   slot 7: BRAND ENVIRONMENT 1:1   (new — retail/space/packaging in-context)
+      // The aspect ratios are matched to the AI's prompt categories so
+      // each mockup arrives in the shape the bento expects.
+      const mockupPrompts = (suggestions.mockupPrompts || []).slice(0, 8);
+      const logoForComposite = logoRes?.dataUrl;
+      const MOCKUP_ASPECTS = ["9:16", "1:1", "2:3", "16:9", "4:3", "1:1", "16:9", "1:1"];
+
+      const buildImageReq = (
+        prompt: string,
+        aspectRatio: string,
+        withLogo: boolean
+      ) =>
+        fetch("/api/image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt,
+            aspectRatio,
+            inputImages:
+              withLogo && logoForComposite ? [logoForComposite] : undefined,
+          }),
+        })
+          .then((r) => r.json())
+          .catch(() => ({ dataUrl: undefined }));
+
+      const mockupResults = await Promise.all(
+        mockupPrompts.map((p, i) =>
+          buildImageReq(
+            logoForComposite
+              ? `${p}\n\nIMPORTANT: Apply the brand logo from the provided image naturally onto the visible product/surface/sign in this scene — preserve its proportions; match the lighting and perspective.`
+              : p,
+            MOCKUP_ASPECTS[i] || "1:1",
+            Boolean(logoForComposite)
+          )
+        )
+      );
 
       const generated: GeneratedBrand = {
         input: brand,
-        logoImageDataUrl: logoForComposite,
+        logoImageDataUrl: logoRes?.dataUrl,
         logoPrompt,
         palettes: suggestions.palettes,
         selectedPalette,
@@ -223,16 +413,27 @@ export default function BrandFlow() {
         tagline: suggestions.taglines?.[0] ?? "",
         story: suggestions.story ?? "",
         patternIdea: suggestions.patternIdea ?? "",
-        essence: suggestions.essence ?? [],
-        iconLabels: suggestions.iconLabels ?? [],
         mockupPrompts,
-        mockupImages: mockResults.map((r) => r?.dataUrl),
-        moodboardPrompts: moodPrompts,
-        moodboardImages: moodResults.map((r) => r?.dataUrl),
-        live,
+        mockupImages: mockupResults.map((r) => r?.dataUrl),
+        // coverImageDataUrl + logoDontExamples are deliberately omitted.
+        // They get filled in by background-generation effects on /result.
       };
       setGeneratedBrand(generated);
+      // eslint-disable-next-line no-console
+      console.log("[finalize] success → /result", {
+        mockupCount: mockupResults.filter((r) => r?.dataUrl).length,
+        hasLogo: Boolean(logoRes?.dataUrl),
+        usedSyntheticPersona: !validPersona,
+      });
       router.push("/result");
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("[finalize] failed", e);
+      setGenError(
+        e instanceof Error
+          ? `Couldn't finish generating — ${e.message}`
+          : "Couldn't finish generating"
+      );
     } finally {
       setBusy(false);
     }
@@ -256,7 +457,10 @@ export default function BrandFlow() {
         subtitle="Taglines, headlines, story, persona — everything written, generated in your language."
         onNext={next}
       >
-        <LanguagePicker value={brand.outputLanguage} onChange={setBrandLanguage} />
+        <LanguagePicker
+          value={brand.outputLanguage}
+          onChange={setBrandLanguage}
+        />
       </StepShell>
     );
   }
@@ -367,7 +571,7 @@ export default function BrandFlow() {
     );
   }
 
-  // ---------- step 4 — archetype & tone (POSTER) ----------
+  // ---------- step 4 — archetype & tone ----------
   if (step === 4) {
     return (
       <StepShell
@@ -382,17 +586,17 @@ export default function BrandFlow() {
             <span className="italic text-spark">speak?</span>
           </>
         }
-        subtitle="Pick the archetype that fits — primary plus secondary if you want a blend. Then sharpen with tone keywords."
+        subtitle="Pick your archetype mix (one or two), then add tone words."
         nextDisabled={brand.archetypes.length === 0}
         onNext={next}
         onBack={back}
       >
-        <div className="space-y-14">
-          <ArchetypePoster
+        <div className="space-y-12">
+          <ArchetypePicker
             selected={brand.archetypes}
             onToggle={toggleBrandArchetype}
           />
-          <div className="border-t border-steel pt-10">
+          <div className="border-t border-steel pt-8">
             <TonePicker
               selected={brand.toneKeywords}
               onToggle={toggleBrandTone}
@@ -419,11 +623,14 @@ export default function BrandFlow() {
             <span className="italic text-spark">mark</span> look like?
           </>
         }
-        subtitle="Pick a logo type, then describe the feeling. Nano Banana takes it from there."
+        subtitle="Pick a logo type, then describe the feeling. Nano Banana 2 takes it from there."
         nextDisabled={!valid}
         onNext={async () => {
-          await fetchSuggestions();
-          next();
+          const ok = await fetchSuggestions();
+          if (ok) next();
+          // On failure, genError state is set and surfaced below. The
+          // user stays on step 5 so they can retry by clicking Continue
+          // again (or adjust their inputs).
         }}
         onBack={back}
         busy={busy}
@@ -444,12 +651,25 @@ export default function BrandFlow() {
               rows={3}
             />
           </div>
+          {genError && (
+            <div
+              role="alert"
+              className="border border-ember/40 bg-ember/5 p-4"
+            >
+              <p className="font-mono text-xs text-ember tracking-wide">
+                {genError}
+              </p>
+              <p className="font-mono text-[10px] text-ash mt-2">
+                Click Continue to try again.
+              </p>
+            </div>
+          )}
         </div>
       </StepShell>
     );
   }
 
-  // ---------- step 6 — palette + concept thumbnails ----------
+  // ---------- step 6 — palette + concept thumbnails (with refinement) ----------
   if (step === 6) {
     return (
       <StepShell
@@ -459,29 +679,40 @@ export default function BrandFlow() {
         eyebrow="06 — direction & palette"
         title={
           <>
-            Pick a
+            Three directions,
             <br />
-            <span className="italic text-spark">direction.</span>
+            <span className="italic text-spark">pick one.</span>
           </>
         }
         subtitle={
           suggestions
-            ? "Each direction has a Nano Banana concept thumbnail so you can see the mood, not just the swatches. Not seeing one that fits? Hit 'More directions' for new options."
+            ? "Each direction comes with a generated concept thumbnail so you can see the mood before committing. Not quite right? Refine below."
             : "Generating directions…"
         }
-        nextDisabled={!selectedPalette}
+        nextDisabled={!selectedPalette || paletteRegenBusy}
         onNext={next}
-        onBack={back}
+        onBack={paletteRegenBusy ? undefined : back}
       >
         {suggestions ? (
-          <PalettePicker
-            options={suggestions.palettes}
-            selected={selectedPalette ?? undefined}
-            onSelect={setSelectedPalette}
-            thumbnailsLoading={thumbnailsLoading}
-            onLoadMore={handleLoadMore}
-            loadingMore={loadingMore}
-          />
+          <>
+            <PalettePicker
+              options={suggestions.palettes}
+              selected={selectedPalette ?? undefined}
+              onSelect={setSelectedPalette}
+              thumbnailsLoading={thumbnailsLoading || paletteRegenBusy}
+            />
+            <RefineBar
+              label="Not quite right? Steer the directions"
+              placeholder='e.g. "darker, more editorial. Less neon, more bone-and-iron." Or: "warmer, sun-bleached, southwestern."'
+              value={paletteNote}
+              onChange={setPaletteNote}
+              onSubmit={regeneratePalettes}
+              busy={paletteRegenBusy}
+              error={paletteRegenError}
+              ctaLabel="Regenerate directions"
+              hint="⌘/Ctrl + Enter to submit · regenerates all three directions and their thumbnails"
+            />
+          </>
         ) : (
           <div className="text-ash font-mono text-sm">Loading…</div>
         )}
@@ -489,7 +720,7 @@ export default function BrandFlow() {
     );
   }
 
-  // ---------- step 7 — typography ----------
+  // ---------- step 7 — typography (with refinement) ----------
   if (step === 7) {
     return (
       <StepShell
@@ -504,17 +735,30 @@ export default function BrandFlow() {
             <span className="italic text-spark">letters.</span>
           </>
         }
-        subtitle="Display + body. Currently-available Google Fonts only."
-        nextDisabled={!selectedType}
+        subtitle="Display + body. Currently-available Google Fonts only. Refine below if these don't fit."
+        nextDisabled={!selectedType || typeRegenBusy}
         onNext={next}
-        onBack={back}
+        onBack={typeRegenBusy ? undefined : back}
       >
         {suggestions ? (
-          <TypePicker
-            options={suggestions.typography}
-            selected={selectedType ?? undefined}
-            onSelect={setSelectedType}
-          />
+          <>
+            <TypePicker
+              options={suggestions.typography}
+              selected={selectedType ?? undefined}
+              onSelect={setSelectedType}
+            />
+            <RefineBar
+              label="Want different type? Steer the pairings"
+              placeholder='e.g. "more editorial serif feel, magazine-style." Or: "cleaner geometric sans, no serifs anywhere."'
+              value={typeNote}
+              onChange={setTypeNote}
+              onSubmit={regenerateTypography}
+              busy={typeRegenBusy}
+              error={typeRegenError}
+              ctaLabel="Regenerate typography"
+              hint="⌘/Ctrl + Enter to submit · returns three fresh pairings"
+            />
+          </>
         ) : (
           <div className="text-ash font-mono text-sm">Loading…</div>
         )}
@@ -539,7 +783,7 @@ export default function BrandFlow() {
           <span className="italic text-spark">build.</span>
         </>
       }
-      subtitle="We'll generate the logo, composite it onto your mockups, then render the full moodboard. Around 10 Nano Banana calls in parallel."
+      subtitle="We'll generate the logo first, then composite it onto your mockups so the brand applies consistently."
       onNext={finalize}
       onBack={back}
       nextLabel={busy ? "Generating bento…" : "Generate bento →"}
@@ -552,7 +796,10 @@ export default function BrandFlow() {
         <SummaryRow label="Audience" value={brand.targetAudience} />
         <SummaryRow label="Mission" value={brand.mission} />
         <SummaryRow label="Archetypes" value={archLabel} />
-        <SummaryRow label="Tone" value={brand.toneKeywords.join(", ") || "—"} />
+        <SummaryRow
+          label="Tone"
+          value={brand.toneKeywords.join(", ") || "—"}
+        />
         <SummaryRow label="Logo style" value={brand.logoStyle} />
         <SummaryRow
           label="Palette"
@@ -562,18 +809,25 @@ export default function BrandFlow() {
         <SummaryRow
           label="Type"
           value={
-            selectedType ? `${selectedType.display} / ${selectedType.body}` : "—"
+            selectedType
+              ? `${selectedType.display} / ${selectedType.body}`
+              : "—"
           }
         />
       </div>
-      <div className="mt-10 max-w-2xl">
-        <p className="font-mono text-[11px] tracking-[0.18em] uppercase text-ash">
-          gemini mode:{" "}
-          <span className={live ? "text-spark" : "text-magenta"}>
-            ● {live ? "live API" : "mock — set GEMINI_API_KEY"}
-          </span>
-        </p>
-      </div>
+      {genError && (
+        <div
+          role="alert"
+          className="mt-10 max-w-4xl border border-ember/40 bg-ember/5 p-4"
+        >
+          <p className="font-mono text-xs text-ember tracking-wide">
+            {genError}
+          </p>
+          <p className="font-mono text-[10px] text-ash mt-2">
+            Click Generate bento again to retry.
+          </p>
+        </div>
+      )}
     </StepShell>
   );
 }
