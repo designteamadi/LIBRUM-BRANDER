@@ -1,68 +1,131 @@
-import type { Metadata } from "next";
-import localFont from "next/font/local";
-import "./globals.css";
+"use client";
 
-// Highrise — headlines / display
-const display = localFont({
-  src: [
-    { path: "../public/fonts/Highrise-Regular.woff2", weight: "400", style: "normal" },
-    { path: "../public/fonts/Highrise-Bold.woff2", weight: "700", style: "normal" },
-  ],
-  variable: "--font-display",
-  display: "swap",
-});
+type Props = {
+  /** full: logotype + BRANDER badge · compact: logotype only · mark: just the L symbol */
+  variant?: "full" | "compact" | "mark";
+  /** Whether to show the BRANDER badge (only applies to "full" variant) */
+  showBrander?: boolean;
+  /** Extra classes on the wrapper */
+  className?: string;
 
-// Adelle Sans — body / subheading / UI / special
-// Multiple weight ranges so font-medium (500), font-semibold (600), font-bold (700)
-// all resolve to real files instead of synthesizing.
-const sans = localFont({
-  src: [
-    { path: "../public/fonts/AdelleSans-Light.woff2", weight: "300", style: "normal" },
-    { path: "../public/fonts/AdelleSans-LightItalic.woff2", weight: "300", style: "italic" },
-    { path: "../public/fonts/AdelleSans-Regular.woff2", weight: "400", style: "normal" },
-    { path: "../public/fonts/AdelleSans-RegularItalic.woff2", weight: "400", style: "italic" },
-    { path: "../public/fonts/AdelleSans-Semibold.woff2", weight: "500 600", style: "normal" },
-    { path: "../public/fonts/AdelleSans-SemiboldItalic.woff2", weight: "500 600", style: "italic" },
-    { path: "../public/fonts/AdelleSans-Bold.woff2", weight: "700 800", style: "normal" },
-    { path: "../public/fonts/AdelleSans-BoldItalic.woff2", weight: "700 800", style: "italic" },
-  ],
-  variable: "--font-sans",
-  display: "swap",
-});
+  // NEW prop names (preferred)
+  /** Tint applied to the logotype / logogram (PNG is recolored via CSS mask) */
+  color?: string;
+  /** Tint applied to the BRANDER badge — text and border */
+  branderColor?: string;
+  /** Height of the logotype in px (the mark variant renders as a square) */
+  size?: number;
 
-// Mono slot — also Adelle Sans (semibold). Existing `font-mono` Tailwind classes
-// still work; they now render in Adelle Sans tracked-out caps instead of JetBrains Mono.
-const mono = localFont({
-  src: [
-    { path: "../public/fonts/AdelleSans-Semibold.woff2", weight: "500 700", style: "normal" },
-  ],
-  variable: "--font-mono",
-  display: "swap",
-});
-
-export const metadata: Metadata = {
-  title: "LIBRUM — Your brand journey partner",
-  description:
-    "Generate a complete brand or a complete campaign — voice, visuals, persona, applied mockups, moodboard — reasoned by Gemini, rendered by Nano Banana.",
-  metadataBase: new URL("https://librum.app"),
-  openGraph: {
-    title: "LIBRUM · brander",
-    description: "Your brand journey partner.",
-    type: "website",
-  },
+  // OLD prop names (kept as aliases so older callers don't break)
+  /** @deprecated use `branderColor` — kept as alias for the L-mark / accent */
+  markColor?: string;
+  /** @deprecated use `color` — kept as alias for the wordmark */
+  textColor?: string;
+  /** @deprecated use `size` */
+  height?: number;
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+// Aspect ratio of /public/librum-logotype.png (4921 × 1182)
+const WORDMARK_RATIO = 4921 / 1182;
+
+/**
+ * Librum logo — uses the actual logotype.png + logogram.png assets, tintable via CSS mask.
+ *
+ *   <Logo />                                         → librum + BRANDER, defaults
+ *   <Logo variant="compact" />                       → logotype only
+ *   <Logo variant="mark" />                          → L symbol only
+ *   <Logo color="#f5f0e8" branderColor="#d4ff3d" />  → preferred (new) props
+ *   <Logo textColor="#f5f0e8" markColor="#d4ff3d" /> → legacy props (still work)
+ *
+ * The PNGs (white on transparent) are recolored via `mask-image`, so the same
+ * asset works in any brand color without needing multiple files.
+ */
+export default function Logo({
+  variant = "full",
+  showBrander = true,
+  className = "",
+  color,
+  branderColor,
+  size,
+  // legacy aliases
+  markColor,
+  textColor,
+  height,
+}: Props) {
+  // Resolve: new prop wins; otherwise fall back to legacy alias; otherwise default.
+  // textColor was used for the wordmark in the old SVG version → maps to new `color`.
+  // markColor was used for the L mark / accent → maps to new `branderColor`.
+  const resolvedColor = color ?? textColor ?? "#f5f0e8";
+  const resolvedBrander = branderColor ?? markColor ?? "#d4ff3d";
+  const resolvedSize = size ?? height ?? 22;
+
+  const wordmarkWidth = Math.round(resolvedSize * WORDMARK_RATIO);
+  const markSize = Math.round(resolvedSize * 1.15);
+  const badgeFont = Math.max(9, Math.round(resolvedSize * 0.4));
+
+  // CSS mask makes the PNG act as a tintable silhouette
+  const maskStyle = (
+    src: string,
+    w: number,
+    h: number,
+    tint: string
+  ): React.CSSProperties => ({
+    display: "inline-block",
+    width: w,
+    height: h,
+    backgroundColor: tint,
+    WebkitMaskImage: `url("${src}")`,
+    maskImage: `url("${src}")`,
+    WebkitMaskSize: "contain",
+    maskSize: "contain",
+    WebkitMaskRepeat: "no-repeat",
+    maskRepeat: "no-repeat",
+    WebkitMaskPosition: "center left",
+    maskPosition: "center left",
+  });
+
+  if (variant === "mark") {
+    return (
+      <span
+        className={className}
+        aria-label="Librum"
+        role="img"
+        style={maskStyle("/librum-logogram.png", markSize, markSize, resolvedBrander)}
+      />
+    );
+  }
+
   return (
-    <html
-      lang="en"
-      className={`${display.variable} ${sans.variable} ${mono.variable}`}
+    <span
+      className={`inline-flex items-center gap-3 ${className}`}
+      aria-label="Librum · BRANDER"
+      role="img"
     >
-      <body className="grain">{children}</body>
-    </html>
+      <span
+        style={maskStyle(
+          "/librum-logotype.png",
+          wordmarkWidth,
+          resolvedSize,
+          resolvedColor
+        )}
+      />
+      {variant === "full" && showBrander && (
+        <span
+          style={{
+            fontFamily: "var(--font-mono), monospace",
+            fontSize: badgeFont,
+            letterSpacing: "0.22em",
+            textTransform: "uppercase",
+            color: resolvedBrander,
+            border: `1px solid ${resolvedBrander}`,
+            padding: "3px 7px",
+            lineHeight: 1,
+            whiteSpace: "nowrap",
+          }}
+        >
+          brander
+        </span>
+      )}
+    </span>
   );
 }
