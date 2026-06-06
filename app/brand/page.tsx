@@ -4,10 +4,10 @@ import { useRouter } from "next/navigation";
 import StepShell from "@/components/StepShell";
 import ArchetypePicker from "@/components/ArchetypePicker";
 import TonePicker from "@/components/TonePicker";
+import LogoStylePicker from "@/components/LogoStylePicker";
+import LanguagePicker from "@/components/LanguagePicker";
 import PalettePicker from "@/components/PalettePicker";
 import TypePicker from "@/components/TypePicker";
-import ChannelPicker from "@/components/ChannelPicker";
-import LanguagePicker from "@/components/LanguagePicker";
 import RefineBar from "@/components/RefineBar";
 import { useBRND } from "@/lib/store";
 import { archetypeByKey } from "@/lib/archetypes";
@@ -15,23 +15,22 @@ import type {
   ColorPalette,
   TypePairing,
   Persona,
-  GeneratedCampaign,
-  MediaChannel,
+  GeneratedBrand,
 } from "@/lib/types";
 
-const TOTAL = 9;
+const TOTAL = 8;
 
 type Suggestions = {
   palettes: ColorPalette[];
   typography: TypePairing[];
-  headlines: string[];
-  cta: string;
-  channelIdeas: Record<MediaChannel, string>;
+  taglines: string[];
+  story: string;
+  patternIdea: string;
   conceptThumbnailPrompts: string[];
   mockupPrompts: string[];
 };
 
-export default function CampaignFlow() {
+export default function BrandFlow() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
@@ -42,6 +41,8 @@ export default function CampaignFlow() {
   );
   const [selectedType, setSelectedType] = useState<TypePairing | null>(null);
 
+  // User-visible error from a failing /api/reason call. Cleared at the
+  // start of each new fetch. Surfaced inline on the step that triggered it.
   const [genError, setGenError] = useState<string | null>(null);
 
   // ---------- Refinement state (steps 6 & 7) ----------
@@ -54,23 +55,29 @@ export default function CampaignFlow() {
   const [typeRegenBusy, setTypeRegenBusy] = useState(false);
   const [typeRegenError, setTypeRegenError] = useState<string | null>(null);
 
-  // Monotonic op counter — see brand/page.tsx for full explanation.
+  // Monotonically-increasing counter used to detect stale async operations.
+  // Every fetchSuggestions / regeneratePalettes / regenerateTypography
+  // call increments this and captures its sequence number. When the call
+  // returns, it bails if the counter has moved on (meaning a newer op has
+  // started and the response would clobber fresh state).
   const opSeqRef = useRef(0);
 
   const {
-    campaign,
-    setCampaign,
-    toggleCampaignArchetype,
-    toggleCampaignTone,
-    toggleChannel,
-    setCampaignLanguage,
+    brand,
+    setBrand,
+    toggleBrandArchetype,
+    toggleBrandTone,
+    setLogoStyle,
+    setBrandLanguage,
     setMode,
-    setGeneratedCampaign,
+    setGeneratedBrand,
   } = useBRND();
 
   const next = () => setStep((s) => Math.min(TOTAL, s + 1));
   const back = () => setStep((s) => Math.max(1, s - 1));
 
+  // Fetch the initial creative suggestions on the way into step 6.
+  // Returns true on success so the caller can decide whether to advance.
   const fetchSuggestions = async (): Promise<boolean> => {
     const seq = ++opSeqRef.current;
     setBusy(true);
@@ -79,13 +86,14 @@ export default function CampaignFlow() {
       const res = await fetch("/api/reason", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: "campaign-suggestions", input: campaign }),
+        body: JSON.stringify({ kind: "brand-suggestions", input: brand }),
       });
       if (!res.ok) throw new Error(`Server returned ${res.status}`);
       const json = (await res.json()) as {
         data?: Suggestions;
         error?: string;
       };
+      // If a newer op has started while we waited, drop this result.
       if (seq !== opSeqRef.current) return false;
       if (json.error) throw new Error(json.error);
       if (
@@ -111,7 +119,9 @@ export default function CampaignFlow() {
     }
   };
 
-  // Concept-thumbnail effect — stale-guard same as brand flow.
+  // Concept-thumbnail generation. Stale-result guarded both by the
+  // expectedKey check (prompts changed mid-flight) and by the fact that
+  // setSuggestions(prev => ...) reads the latest state synchronously.
   useEffect(() => {
     if (!suggestions || !suggestions.conceptThumbnailPrompts) return;
     if (suggestions.palettes.every((p) => p.conceptImageDataUrl)) return;
@@ -151,7 +161,7 @@ export default function CampaignFlow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [suggestions?.conceptThumbnailPrompts?.join("|")]);
 
-  // ---------- Regenerate campaign directions (step 6) ----------
+  // ---------- Regenerate palettes & directions (step 6) ----------
   const regeneratePalettes = async () => {
     if (paletteRegenBusy) return;
     const seq = ++opSeqRef.current;
@@ -162,8 +172,8 @@ export default function CampaignFlow() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          kind: "campaign-palettes",
-          input: campaign,
+          kind: "brand-palettes",
+          input: brand,
           note: paletteNote.trim() || undefined,
         }),
       });
@@ -180,17 +190,24 @@ export default function CampaignFlow() {
         throw new Error(json.error || "No palettes returned");
       }
       const { palettes, conceptThumbnailPrompts } = json.data;
+      // Strip any thumbnails from incoming palettes so the existing useEffect
+      // will fetch fresh ones for the new directions.
       const fresh = palettes.map((p) => ({
         ...p,
         conceptImageDataUrl: undefined,
       }));
+      // If Gemini omitted conceptThumbnailPrompts (or returned a wrong-length
+      // array), synthesize fallback prompts from the new palette names. This
+      // GUARANTEES the thumbnail useEffect's dependency changes so new
+      // thumbnails are fetched — without this, the new palettes would show
+      // "preview unavailable" forever.
       const safePrompts =
         conceptThumbnailPrompts &&
         conceptThumbnailPrompts.length === fresh.length
           ? conceptThumbnailPrompts
           : fresh.map(
               (p) =>
-                `Cinematic campaign hero composition for "${campaign.campaignName || campaign.brandName}", ${p.name} direction — ${p.rationale}`
+                `Cinematic editorial hero composition representing ${brand.businessName} in the ${p.name} direction — ${p.rationale}`
             );
       setSuggestions((prev) => {
         if (!prev) return prev;
@@ -214,7 +231,7 @@ export default function CampaignFlow() {
     }
   };
 
-  // ---------- Regenerate campaign typography (step 7) ----------
+  // ---------- Regenerate typography (step 7) ----------
   const regenerateTypography = async () => {
     if (typeRegenBusy) return;
     const seq = ++opSeqRef.current;
@@ -225,8 +242,8 @@ export default function CampaignFlow() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          kind: "campaign-typography",
-          input: campaign,
+          kind: "brand-typography",
+          input: brand,
           note: typeNote.trim() || undefined,
         }),
       });
@@ -258,75 +275,42 @@ export default function CampaignFlow() {
     }
   };
 
+  // Generate the persona, logo, and mockups, then go to /result.
+  // Surfaces failures inline instead of silently swallowing them.
   const finalize = async () => {
     if (!selectedPalette || !selectedType || !suggestions) return;
     setBusy(true);
     setGenError(null);
-    setMode("campaign");
+    setMode("brand");
     // eslint-disable-next-line no-console
-    console.log("[finalize:campaign] start", {
-      campaignName: campaign.campaignName,
+    console.log("[finalize] start", {
+      businessName: brand.businessName,
       palette: selectedPalette.name,
       type: `${selectedType.display}/${selectedType.body}`,
     });
     try {
-      // -------- Single parallel stage --------
-      // For campaigns the brand logo is uploaded at step 2 (already in
-      // campaign.logoDataUrl), so persona text + 6 mockups can all start
-      // immediately. Cover image — playbook-only — is background-gen on
-      // /result so the bento appears faster.
-      //
-      // 6 mockup slots (matching the prompt categories from /api/reason):
-      //   slot 0: HERO          9:16
-      //   slot 1: SOCIAL POST   1:1
-      //   slot 2: STORY/REEL    9:16
-      //   slot 3: POSTER        2:3
-      //   slot 4: PHOTO MOOD    1:1
-      //   slot 5: OOH           16:9
-      //   slot 6: DIGITAL BANNER  16:9  (new — web/in-app marquee banner)
-      //   slot 7: CAMPAIGN ACTIVATION 1:1 (new — pop-up/installation/event)
-      const prompts = (suggestions.mockupPrompts || []).slice(0, 8);
-      const userLogo = campaign.logoDataUrl;
-      const MOCKUP_ASPECTS = ["9:16", "1:1", "9:16", "2:3", "1:1", "16:9", "16:9", "1:1"];
+      // -------- Stage 1 (parallel, no inter-deps): persona + logo --------
+      // The persona is text (fast); the logo is an image (slow). They have
+      // no dependencies on each other so we kick both off together.
+      const logoPrompt = `Studio brand logo for "${brand.businessName}". Style: ${brand.logoStyle}. ${brand.logoPrompt}. Clean, modern, on a plain background, suitable as a brand mark. Premium feel.`;
 
-      const buildImageReq = (
-        prompt: string,
-        aspectRatio: string,
-        withLogo: boolean
-      ) =>
-        fetch("/api/image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt,
-            aspectRatio,
-            inputImages: withLogo && userLogo ? [userLogo] : undefined,
-          }),
-        })
-          .then((r) => r.json())
-          .catch(() => ({ dataUrl: undefined }));
-
-      const [personaRes, imgResults] = await Promise.all([
+      const [personaRes, logoRes] = await Promise.all([
         fetch("/api/reason", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            kind: "campaign-persona",
-            input: campaign,
+            kind: "brand-persona",
+            input: brand,
             palette: selectedPalette,
           }),
         }),
-        Promise.all(
-          prompts.map((p, i) =>
-            buildImageReq(
-              userLogo
-                ? `${p}\n\nIMPORTANT: Apply the brand logo from the provided image naturally onto the visible product/surface/sign in this scene — preserve its proportions; match the lighting and perspective.`
-                : p,
-              MOCKUP_ASPECTS[i] || "1:1",
-              Boolean(userLogo)
-            )
-          )
-        ),
+        fetch("/api/image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: logoPrompt, aspectRatio: "1:1" }),
+        })
+          .then((r) => r.json())
+          .catch(() => ({ dataUrl: undefined })),
       ]);
 
       if (!personaRes.ok) {
@@ -337,8 +321,9 @@ export default function CampaignFlow() {
         error?: string;
       };
       // Persona must have name + description + traits[] for the Bento to
-      // render without crashing. If any field is missing or malformed,
-      // synthesize a fallback from the campaign inputs rather than throw.
+      // render without crashing. If ANY field is missing or malformed,
+      // synthesize a fallback from the brand inputs rather than throw —
+      // we'd rather ship an imperfect persona than fail to render the result.
       const d = personaJson.data;
       const validPersona =
         d &&
@@ -352,50 +337,98 @@ export default function CampaignFlow() {
       const persona: Persona = validPersona
         ? (d as Persona)
         : {
-            name: campaign.campaignName || campaign.brandName || "The Voice",
+            name: brand.businessName || "The Brand",
             description:
-              campaign.campaignStory ||
-              campaign.campaignPurpose ||
-              `A campaign voice built around ${campaign.toneKeywords.join(", ") || "conviction"}.`,
+              brand.description ||
+              brand.mission ||
+              `A brand built around ${brand.toneKeywords.join(", ") || "honest craft"}.`,
             traits:
-              campaign.toneKeywords.length > 0
-                ? campaign.toneKeywords.slice(0, 5)
-                : ["composed", "incisive", "low-volume", "high-conviction", "magnetic"],
+              brand.toneKeywords.length > 0
+                ? brand.toneKeywords.slice(0, 5)
+                : ["considered", "deliberate", "honest", "warm", "specific"],
           };
       if (!validPersona) {
         // eslint-disable-next-line no-console
         console.warn(
-          "[finalize] campaign persona response was malformed; using synthetic fallback",
+          "[finalize] persona response was malformed; using synthetic fallback",
           { received: personaJson }
         );
       }
 
-      const generated: GeneratedCampaign = {
-        input: campaign,
+      // -------- Stage 2 (parallel, depends on logo): 6 categorized mockups
+      //   slot 0: HERO         9:16
+      //   slot 0: HERO          9:16
+      //   slot 1: SOCIAL        1:1
+      //   slot 2: POSTER        2:3
+      //   slot 3: OOH/BILLBOARD 16:9
+      //   slot 4: COLLATERAL    4:3
+      //   slot 5: PHOTOGRAPHY   1:1
+      //   slot 6: EDITORIAL BANNER 16:9   (new — wide marquee web/print banner)
+      //   slot 7: BRAND ENVIRONMENT 1:1   (new — retail/space/packaging in-context)
+      // The aspect ratios are matched to the AI's prompt categories so
+      // each mockup arrives in the shape the bento expects.
+      const mockupPrompts = (suggestions.mockupPrompts || []).slice(0, 8);
+      const logoForComposite = logoRes?.dataUrl;
+      const MOCKUP_ASPECTS = ["9:16", "1:1", "2:3", "16:9", "4:3", "1:1", "16:9", "1:1"];
+
+      const buildImageReq = (
+        prompt: string,
+        aspectRatio: string,
+        withLogo: boolean
+      ) =>
+        fetch("/api/image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt,
+            aspectRatio,
+            inputImages:
+              withLogo && logoForComposite ? [logoForComposite] : undefined,
+          }),
+        })
+          .then((r) => r.json())
+          .catch(() => ({ dataUrl: undefined }));
+
+      const mockupResults = await Promise.all(
+        mockupPrompts.map((p, i) =>
+          buildImageReq(
+            logoForComposite
+              ? `${p}\n\nIMPORTANT: Apply the brand logo from the provided image naturally onto the visible product/surface/sign in this scene — preserve its proportions; match the lighting and perspective.`
+              : p,
+            MOCKUP_ASPECTS[i] || "1:1",
+            Boolean(logoForComposite)
+          )
+        )
+      );
+
+      const generated: GeneratedBrand = {
+        input: brand,
+        logoImageDataUrl: logoRes?.dataUrl,
+        logoPrompt,
         palettes: suggestions.palettes,
         selectedPalette,
         typography: suggestions.typography,
         selectedType,
         persona,
-        headlines: suggestions.headlines ?? [],
-        cta: suggestions.cta ?? "",
-        channelIdeas:
-          suggestions.channelIdeas ?? ({} as Record<MediaChannel, string>),
-        mockupPrompts: prompts,
-        mockupImages: imgResults.map((r) => r?.dataUrl),
-        // coverImageDataUrl is filled in by background generation on /result.
+        tagline: suggestions.taglines?.[0] ?? "",
+        story: suggestions.story ?? "",
+        patternIdea: suggestions.patternIdea ?? "",
+        mockupPrompts,
+        mockupImages: mockupResults.map((r) => r?.dataUrl),
+        // coverImageDataUrl + logoDontExamples are deliberately omitted.
+        // They get filled in by background-generation effects on /result.
       };
-      setGeneratedCampaign(generated);
+      setGeneratedBrand(generated);
       // eslint-disable-next-line no-console
-      console.log("[finalize:campaign] success → /result", {
-        mockupCount: imgResults.filter((r) => r?.dataUrl).length,
-        hasLogo: Boolean(userLogo),
+      console.log("[finalize] success → /result", {
+        mockupCount: mockupResults.filter((r) => r?.dataUrl).length,
+        hasLogo: Boolean(logoRes?.dataUrl),
         usedSyntheticPersona: !validPersona,
       });
       router.push("/result");
     } catch (e) {
       // eslint-disable-next-line no-console
-      console.error("[finalize:campaign] failed", e);
+      console.error("[finalize] failed", e);
       setGenError(
         e instanceof Error
           ? `Couldn't finish generating — ${e.message}`
@@ -406,20 +439,11 @@ export default function CampaignFlow() {
     }
   };
 
-  const onLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const reader = new FileReader();
-    reader.onload = () =>
-      setCampaign({ logoDataUrl: String(reader.result) });
-    reader.readAsDataURL(f);
-  };
-
   // ---------- step 1 — language ----------
   if (step === 1) {
     return (
       <StepShell
-        flowLabel="Campaign"
+        flowLabel="Brand"
         step={1}
         total={TOTAL}
         eyebrow="01 — language"
@@ -430,86 +454,68 @@ export default function CampaignFlow() {
             the <span className="italic text-spark">copy</span> be in?
           </>
         }
-        subtitle="Headlines, CTAs, channel ideas — all generated in your language."
+        subtitle="Taglines, headlines, story, persona — everything written, generated in your language."
         onNext={next}
       >
         <LanguagePicker
-          value={campaign.outputLanguage}
-          onChange={setCampaignLanguage}
+          value={brand.outputLanguage}
+          onChange={setBrandLanguage}
         />
       </StepShell>
     );
   }
 
-  // ---------- step 2 — brand ----------
+  // ---------- step 2 — basics ----------
   if (step === 2) {
     const valid =
-      campaign.brandName.trim() && campaign.brandDescription.trim();
+      brand.businessName.trim() &&
+      brand.industry.trim() &&
+      brand.description.trim();
     return (
       <StepShell
-        flowLabel="Campaign"
+        flowLabel="Brand"
         step={2}
         total={TOTAL}
-        eyebrow="02 — your brand"
+        eyebrow="02 — business basics"
         title={
           <>
-            Start with the
+            What are we
             <br />
-            <span className="italic text-spark">brand.</span>
+            <span className="italic text-spark">building?</span>
           </>
         }
-        subtitle="Upload your logo and tell us about the business. We'll composite it onto every campaign visual."
+        subtitle="Plain words beat clever ones — the model reasons better from honest inputs."
         nextDisabled={!valid}
         onNext={next}
         onBack={back}
       >
         <div className="space-y-10 max-w-2xl">
           <div>
-            <p className="eyebrow mb-3">Upload your logo</p>
-            <label className="block border-2 border-dashed border-steel hover:border-spark transition-colors p-8 cursor-pointer text-center">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={onLogoChange}
-                className="hidden"
-              />
-              {campaign.logoDataUrl ? (
-                <div className="flex flex-col items-center gap-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={campaign.logoDataUrl}
-                    alt="Logo"
-                    className="max-h-24 max-w-xs object-contain"
-                  />
-                  <span className="font-mono text-[11px] tracking-widest uppercase text-spark">
-                    Replace
-                  </span>
-                </div>
-              ) : (
-                <div className="font-mono text-[11px] tracking-widest uppercase text-ash">
-                  click to upload · PNG / SVG / JPG
-                </div>
-              )}
-            </label>
-          </div>
-          <div>
-            <p className="eyebrow mb-3">Brand name</p>
+            <p className="eyebrow mb-3">Business name</p>
             <input
               className="field"
-              value={campaign.brandName}
-              onChange={(e) => setCampaign({ brandName: e.target.value })}
+              value={brand.businessName}
+              onChange={(e) => setBrand({ businessName: e.target.value })}
               placeholder="Roam"
+              autoFocus
             />
           </div>
           <div>
-            <p className="eyebrow mb-3">What is the business about?</p>
+            <p className="eyebrow mb-3">Industry</p>
+            <input
+              className="field field-sm"
+              value={brand.industry}
+              onChange={(e) => setBrand({ industry: e.target.value })}
+              placeholder="Outdoor gear · Hospitality · Fintech · …"
+            />
+          </div>
+          <div>
+            <p className="eyebrow mb-3">What does the business do?</p>
             <textarea
               className="field field-sm"
-              value={campaign.brandDescription}
-              onChange={(e) =>
-                setCampaign({ brandDescription: e.target.value })
-              }
-              placeholder="Two sentences. What you make, who it's for."
+              value={brand.description}
+              onChange={(e) => setBrand({ description: e.target.value })}
+              placeholder="One or two sentences. What you make, who it's for."
               rows={3}
             />
           </div>
@@ -518,61 +524,45 @@ export default function CampaignFlow() {
     );
   }
 
-  // ---------- step 3 — brief ----------
+  // ---------- step 3 — audience & mission ----------
   if (step === 3) {
-    const valid =
-      campaign.campaignName.trim() &&
-      campaign.campaignPurpose.trim() &&
-      campaign.campaignStory.trim();
+    const valid = brand.targetAudience.trim() && brand.mission.trim();
     return (
       <StepShell
-        flowLabel="Campaign"
+        flowLabel="Brand"
         step={3}
         total={TOTAL}
-        eyebrow="03 — the brief"
+        eyebrow="03 — audience & mission"
         title={
           <>
-            What is the
+            Who is it
             <br />
-            <span className="italic text-spark">campaign?</span>
+            <span className="italic text-spark">for?</span>
           </>
         }
-        subtitle="The shorter you say it, the sharper it lands."
+        subtitle="Specifics over demographics."
         nextDisabled={!valid}
         onNext={next}
         onBack={back}
       >
         <div className="space-y-10 max-w-2xl">
           <div>
-            <p className="eyebrow mb-3">Campaign name</p>
-            <input
-              className="field"
-              value={campaign.campaignName}
-              onChange={(e) => setCampaign({ campaignName: e.target.value })}
-              placeholder="No Map, No Excuses"
+            <p className="eyebrow mb-3">Target audience</p>
+            <textarea
+              className="field field-sm"
+              value={brand.targetAudience}
+              onChange={(e) => setBrand({ targetAudience: e.target.value })}
+              placeholder="Be specific. What do they already love, hate, want?"
+              rows={3}
             />
           </div>
           <div>
-            <p className="eyebrow mb-3">Purpose</p>
+            <p className="eyebrow mb-3">Mission — why does this exist?</p>
             <textarea
               className="field field-sm"
-              value={campaign.campaignPurpose}
-              onChange={(e) =>
-                setCampaign({ campaignPurpose: e.target.value })
-              }
-              placeholder="Drive product launch awareness · Reposition the brand · Reactivate lapsed users · …"
-              rows={2}
-            />
-          </div>
-          <div>
-            <p className="eyebrow mb-3">The story — what are we actually saying?</p>
-            <textarea
-              className="field field-sm"
-              value={campaign.campaignStory}
-              onChange={(e) =>
-                setCampaign({ campaignStory: e.target.value })
-              }
-              placeholder="The single idea this campaign exists to communicate."
+              value={brand.mission}
+              onChange={(e) => setBrand({ mission: e.target.value })}
+              placeholder="The thing the world is missing that this fixes."
               rows={3}
             />
           </div>
@@ -581,73 +571,84 @@ export default function CampaignFlow() {
     );
   }
 
-  // ---------- step 4 — target market ----------
+  // ---------- step 4 — archetype & tone ----------
   if (step === 4) {
     return (
       <StepShell
-        flowLabel="Campaign"
+        flowLabel="Brand"
         step={4}
         total={TOTAL}
-        eyebrow="04 — target market"
+        eyebrow="04 — archetype & voice"
         title={
           <>
-            Who needs to
+            How does it
             <br />
-            <span className="italic text-spark">hear this?</span>
+            <span className="italic text-spark">speak?</span>
           </>
         }
-        subtitle="A real person, not a segment."
-        nextDisabled={!campaign.targetMarket.trim()}
+        subtitle="Pick your archetype mix (one or two), then add tone words."
+        nextDisabled={brand.archetypes.length === 0}
         onNext={next}
         onBack={back}
       >
-        <div className="max-w-2xl">
-          <textarea
-            className="field field-sm"
-            value={campaign.targetMarket}
-            onChange={(e) => setCampaign({ targetMarket: e.target.value })}
-            placeholder="Twenty-five to thirty-five, lives in dense cities, has stopped trusting most brands but still wants to be moved by one."
-            rows={4}
+        <div className="space-y-12">
+          <ArchetypePicker
+            selected={brand.archetypes}
+            onToggle={toggleBrandArchetype}
           />
+          <div className="border-t border-steel pt-8">
+            <TonePicker
+              selected={brand.toneKeywords}
+              onToggle={toggleBrandTone}
+            />
+          </div>
         </div>
       </StepShell>
     );
   }
 
-  // ---------- step 5 — archetype + tone ----------
+  // ---------- step 5 — logo ----------
   if (step === 5) {
+    const valid = brand.logoPrompt.trim().length > 5;
     return (
       <StepShell
-        flowLabel="Campaign"
+        flowLabel="Brand"
         step={5}
         total={TOTAL}
-        eyebrow="05 — archetype & voice"
+        eyebrow="05 — logo direction"
         title={
           <>
-            How should the
+            What should the
             <br />
-            <span className="italic text-spark">campaign</span> sound?
+            <span className="italic text-spark">mark</span> look like?
           </>
         }
-        subtitle="Campaigns can lean different from the parent brand. That contrast is often the move."
-        nextDisabled={campaign.archetypes.length === 0}
+        subtitle="Pick a logo type, then describe the feeling. Nano Banana 2 takes it from there."
+        nextDisabled={!valid}
         onNext={async () => {
           const ok = await fetchSuggestions();
           if (ok) next();
+          // On failure, genError state is set and surfaced below. The
+          // user stays on step 5 so they can retry by clicking Continue
+          // again (or adjust their inputs).
         }}
         onBack={back}
         busy={busy}
         nextLabel={busy ? "Reasoning…" : "Continue"}
       >
-        <div className="space-y-12">
-          <ArchetypePicker
-            selected={campaign.archetypes}
-            onToggle={toggleCampaignArchetype}
+        <div className="space-y-10">
+          <LogoStylePicker
+            selected={brand.logoStyle}
+            onSelect={setLogoStyle}
           />
-          <div className="border-t border-steel pt-8">
-            <TonePicker
-              selected={campaign.toneKeywords}
-              onToggle={toggleCampaignTone}
+          <div>
+            <p className="eyebrow mb-3">Describe the look</p>
+            <textarea
+              className="field field-sm"
+              value={brand.logoPrompt}
+              onChange={(e) => setBrand({ logoPrompt: e.target.value })}
+              placeholder="Sharp, minimal, a single geometric peak. No serifs. Charcoal on bone."
+              rows={3}
             />
           </div>
           {genError && (
@@ -668,11 +669,11 @@ export default function CampaignFlow() {
     );
   }
 
-  // ---------- step 6 — palette with concept thumbnails (with refinement) ----------
+  // ---------- step 6 — palette + concept thumbnails (with refinement) ----------
   if (step === 6) {
     return (
       <StepShell
-        flowLabel="Campaign"
+        flowLabel="Brand"
         step={6}
         total={TOTAL}
         eyebrow="06 — direction & palette"
@@ -685,7 +686,7 @@ export default function CampaignFlow() {
         }
         subtitle={
           suggestions
-            ? "Each direction has a concept thumbnail so you see the mood before committing. Not quite right? Refine below."
+            ? "Each direction comes with a generated concept thumbnail so you can see the mood before committing. Not quite right? Refine below."
             : "Generating directions…"
         }
         nextDisabled={!selectedPalette || paletteRegenBusy}
@@ -702,7 +703,7 @@ export default function CampaignFlow() {
             />
             <RefineBar
               label="Not quite right? Steer the directions"
-              placeholder='e.g. "darker, more cinematic. Less corporate." Or: "warmer, sun-bleached, southwestern."'
+              placeholder='e.g. "darker, more editorial. Less neon, more bone-and-iron." Or: "warmer, sun-bleached, southwestern."'
               value={paletteNote}
               onChange={setPaletteNote}
               onSubmit={regeneratePalettes}
@@ -723,7 +724,7 @@ export default function CampaignFlow() {
   if (step === 7) {
     return (
       <StepShell
-        flowLabel="Campaign"
+        flowLabel="Brand"
         step={7}
         total={TOTAL}
         eyebrow="07 — typography"
@@ -765,77 +766,41 @@ export default function CampaignFlow() {
     );
   }
 
-  // ---------- step 8 — channels ----------
-  if (step === 8) {
-    return (
-      <StepShell
-        flowLabel="Campaign"
-        step={8}
-        total={TOTAL}
-        eyebrow="08 — channels"
-        title={
-          <>
-            Where does it
-            <br />
-            <span className="italic text-spark">live?</span>
-          </>
-        }
-        subtitle="Pick the channels you'll actually run. We'll generate a channel-specific idea for each."
-        nextDisabled={campaign.channels.length === 0}
-        onNext={next}
-        onBack={back}
-      >
-        <ChannelPicker
-          selected={campaign.channels}
-          onToggle={toggleChannel}
-        />
-      </StepShell>
-    );
-  }
-
-  // ---------- step 9 — review ----------
-  const archLabel = campaign.archetypes
+  // ---------- step 8 — review & generate ----------
+  const archLabel = brand.archetypes
     .map((a) => archetypeByKey(a).name)
     .join(" + ");
   return (
     <StepShell
-      flowLabel="Campaign"
-      step={9}
+      flowLabel="Brand"
+      step={8}
       total={TOTAL}
-      eyebrow="09 — review & generate"
+      eyebrow="08 — review & generate"
       title={
         <>
           Ready to
           <br />
-          <span className="italic text-spark">launch.</span>
+          <span className="italic text-spark">build.</span>
         </>
       }
-      subtitle={
-        campaign.logoDataUrl
-          ? "We'll composite your logo onto every generated visual using Nano Banana 2's image editing mode."
-          : "Heads up — no logo uploaded. Visuals will be generated without your mark."
-      }
+      subtitle="We'll generate the logo first, then composite it onto your mockups so the brand applies consistently."
       onNext={finalize}
       onBack={back}
       nextLabel={busy ? "Generating bento…" : "Generate bento →"}
       busy={busy}
     >
       <div className="grid md:grid-cols-2 gap-8 max-w-4xl">
-        <SummaryRow label="Language" value={campaign.outputLanguage.toUpperCase()} />
-        <SummaryRow label="Brand" value={campaign.brandName} />
-        <SummaryRow label="Campaign" value={campaign.campaignName} />
-        <SummaryRow label="Purpose" value={campaign.campaignPurpose} />
-        <SummaryRow label="Story" value={campaign.campaignStory} />
-        <SummaryRow label="Target" value={campaign.targetMarket} />
+        <SummaryRow label="Language" value={brand.outputLanguage.toUpperCase()} />
+        <SummaryRow label="Name" value={brand.businessName} />
+        <SummaryRow label="Industry" value={brand.industry} />
+        <SummaryRow label="Audience" value={brand.targetAudience} />
+        <SummaryRow label="Mission" value={brand.mission} />
         <SummaryRow label="Archetypes" value={archLabel} />
         <SummaryRow
           label="Tone"
-          value={campaign.toneKeywords.join(", ") || "—"}
+          value={brand.toneKeywords.join(", ") || "—"}
         />
-        <SummaryRow
-          label="Channels"
-          value={campaign.channels.join(", ") || "—"}
-        />
+        <SummaryRow label="Logo style" value={brand.logoStyle} />
         <SummaryRow
           label="Palette"
           value={selectedPalette?.name ?? "—"}
