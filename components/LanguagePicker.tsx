@@ -15,7 +15,9 @@ export default function LanguagePicker({ value, onChange }: Props) {
         return (
           <button
             key={l.code}
+            type="button"
             onClick={() => onChange(l.code)}
+            aria-pressed={on}
             className={`chip p-4 border text-left transition-all ${
               on
                 ? "border-spark bg-spark/5"
