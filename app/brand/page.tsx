@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import StepShell from "@/components/StepShell";
-import ArchetypePoster from "@/components/ArchetypePoster";
+import ArchetypePicker from "@/components/ArchetypePicker";
 import TonePicker from "@/components/TonePicker";
 import LogoStylePicker from "@/components/LogoStylePicker";
 import LanguagePicker from "@/components/LanguagePicker";
@@ -592,7 +592,7 @@ export default function BrandFlow() {
         onBack={back}
       >
         <div className="space-y-12">
-          <ArchetypePoster
+          <ArchetypePicker
             selected={brand.archetypes}
             onToggle={toggleBrandArchetype}
           />
