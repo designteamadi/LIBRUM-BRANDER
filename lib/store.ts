@@ -59,9 +59,11 @@ type State = {
   setGeneratedCampaign: (g: GeneratedCampaign) => void;
   setMode: (m: "brand" | "campaign") => void;
   updateBrandMockup: (idx: number, dataUrl: string) => void;
+  updateBrandLogo: (dataUrl: string) => void;
+  updateBrandCover: (dataUrl: string) => void;
+  updateBrandDontExamples: (examples: (string | undefined)[]) => void;
   updateCampaignMockup: (idx: number, dataUrl: string) => void;
-  updateBrandMoodboard: (idx: number, dataUrl: string) => void;
-  updateCampaignMoodboard: (idx: number, dataUrl: string) => void;
+  updateCampaignCover: (dataUrl: string) => void;
   reset: () => void;
 };
 
@@ -136,33 +138,46 @@ export const useBRND = create<State>()(
             generatedBrand: { ...s.generatedBrand, mockupImages: mockups },
           };
         }),
+      updateBrandLogo: (dataUrl) =>
+        set((s) => {
+          if (!s.generatedBrand) return s;
+          return {
+            generatedBrand: { ...s.generatedBrand, logoImageDataUrl: dataUrl },
+          };
+        }),
+      updateBrandCover: (dataUrl) =>
+        set((s) => {
+          if (!s.generatedBrand) return s;
+          return {
+            generatedBrand: { ...s.generatedBrand, coverImageDataUrl: dataUrl },
+          };
+        }),
+      updateBrandDontExamples: (examples) =>
+        set((s) => {
+          if (!s.generatedBrand) return s;
+          return {
+            generatedBrand: { ...s.generatedBrand, logoDontExamples: examples },
+          };
+        }),
       updateCampaignMockup: (idx, dataUrl) =>
         set((s) => {
           if (!s.generatedCampaign) return s;
           const mockups = [...s.generatedCampaign.mockupImages];
           mockups[idx] = dataUrl;
           return {
-            generatedCampaign: { ...s.generatedCampaign, mockupImages: mockups },
+            generatedCampaign: {
+              ...s.generatedCampaign,
+              mockupImages: mockups,
+            },
           };
         }),
-      updateBrandMoodboard: (idx, dataUrl) =>
-        set((s) => {
-          if (!s.generatedBrand) return s;
-          const moodboard = [...s.generatedBrand.moodboardImages];
-          moodboard[idx] = dataUrl;
-          return {
-            generatedBrand: { ...s.generatedBrand, moodboardImages: moodboard },
-          };
-        }),
-      updateCampaignMoodboard: (idx, dataUrl) =>
+      updateCampaignCover: (dataUrl) =>
         set((s) => {
           if (!s.generatedCampaign) return s;
-          const moodboard = [...s.generatedCampaign.moodboardImages];
-          moodboard[idx] = dataUrl;
           return {
             generatedCampaign: {
               ...s.generatedCampaign,
-              moodboardImages: moodboard,
+              coverImageDataUrl: dataUrl,
             },
           };
         }),
@@ -176,8 +191,19 @@ export const useBRND = create<State>()(
         }),
     }),
     {
-      name: "librum-store",
+      name: "brnd-store",
       storage: createJSONStorage(() => sessionStorage),
+      // Only persist the wizard INPUTS to sessionStorage. The generated*
+      // objects contain base64-encoded mockup images that can run into
+      // megabytes — easily exceeding sessionStorage's ~5MB per-origin quota
+      // and causing the persist write to throw. Generated output is in-memory
+      // only and lives for the duration of the SPA session, which is all we
+      // need: the user goes /brand → /result in one navigation.
+      partialize: (state) => ({
+        brand: state.brand,
+        campaign: state.campaign,
+        mode: state.mode,
+      }),
     }
   )
 );
