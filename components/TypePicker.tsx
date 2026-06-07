@@ -17,7 +17,9 @@ export default function TypePicker({ options, selected, onSelect }: Props) {
         return (
           <button
             key={idx}
+            type="button"
             onClick={() => onSelect(t)}
+            aria-pressed={on}
             className={`text-left border p-6 transition-all ${
               on ? "border-spark" : "border-steel hover:border-ash"
             }`}
