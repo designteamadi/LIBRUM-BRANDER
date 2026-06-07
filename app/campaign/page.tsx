@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import StepShell from "@/components/StepShell";
-import ArchetypePoster from "@/components/ArchetypePoster";
+import ArchetypePicker from "@/components/ArchetypePicker";
 import TonePicker from "@/components/TonePicker";
 import PalettePicker from "@/components/PalettePicker";
 import TypePicker from "@/components/TypePicker";
@@ -640,7 +640,7 @@ export default function CampaignFlow() {
         nextLabel={busy ? "Reasoning…" : "Continue"}
       >
         <div className="space-y-12">
-          <ArchetypePoster
+          <ArchetypePicker
             selected={campaign.archetypes}
             onToggle={toggleCampaignArchetype}
           />
