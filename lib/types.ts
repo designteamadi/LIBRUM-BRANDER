@@ -47,12 +47,6 @@ export type Persona = {
   traits: string[];
 };
 
-export type EssenceItem = {
-  title: string;
-  body: string;
-  icon: string;
-};
-
 export type BrandInput = {
   businessName: string;
   industry: string;
@@ -104,14 +98,16 @@ export type GeneratedBrand = {
   tagline: string;
   story: string;
   patternIdea: string;
-  essence: EssenceItem[];
-  iconLabels: string[];
   mockupPrompts: string[];
   mockupImages: (string | undefined)[];
-  moodboardPrompts: string[];
-  moodboardImages: (string | undefined)[];
-  /** True if Gemini API was actually called; false if mocks were used */
-  live: boolean;
+  /** Nano Banana 2-generated editorial hero image used as the playbook cover background. */
+  coverImageDataUrl?: string;
+  /**
+   * Six Nano Banana 2-generated "what NOT to do" examples for the logo:
+   * stretched, rotated, recolored, outlined, crowded, patterned. Shown on
+   * the playbook's "Don't" page as concrete bad-usage illustrations.
+   */
+  logoDontExamples?: (string | undefined)[];
 };
 
 export type GeneratedCampaign = {
@@ -124,33 +120,25 @@ export type GeneratedCampaign = {
   headlines: string[];
   cta: string;
   channelIdeas: Record<MediaChannel, string>;
-  essence: EssenceItem[];
-  iconLabels: string[];
   mockupPrompts: string[];
   mockupImages: (string | undefined)[];
-  moodboardPrompts: string[];
-  moodboardImages: (string | undefined)[];
-  live: boolean;
+  /** Nano Banana 2-generated editorial hero image used as the campaign-book cover. */
+  coverImageDataUrl?: string;
 };
 
 export type ReasonRequest =
   | { kind: "brand-suggestions"; input: BrandInput }
   | { kind: "brand-persona"; input: BrandInput; palette: ColorPalette }
+  | { kind: "brand-palettes"; input: BrandInput; note?: string }
+  | { kind: "brand-typography"; input: BrandInput; note?: string }
   | { kind: "campaign-suggestions"; input: CampaignInput }
   | { kind: "campaign-persona"; input: CampaignInput; palette: ColorPalette }
-  | {
-      kind: "more-brand-palettes";
-      input: BrandInput;
-      existing: ColorPalette[];
-    }
-  | {
-      kind: "more-campaign-palettes";
-      input: CampaignInput;
-      existing: ColorPalette[];
-    };
+  | { kind: "campaign-palettes"; input: CampaignInput; note?: string }
+  | { kind: "campaign-typography"; input: CampaignInput; note?: string };
 
 export type ImageRequest = {
   prompt: string;
   aspectRatio?: "1:1" | "16:9" | "9:16" | "4:5";
+  /** Optional input images (data URLs) for compositing — Nano Banana edit mode */
   inputImages?: string[];
 };
