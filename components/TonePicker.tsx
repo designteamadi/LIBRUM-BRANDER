@@ -41,7 +41,9 @@ export default function TonePicker({ selected, onToggle }: Props) {
           return (
             <button
               key={t}
+              type="button"
               onClick={() => onToggle(t)}
+              aria-pressed={on}
               className={`chip px-5 py-2 border text-sm transition-all ${
                 on
                   ? "border-spark text-spark bg-spark/5"
@@ -61,6 +63,10 @@ export default function TonePicker({ selected, onToggle }: Props) {
           onChange={(e) => setCustom(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && custom.trim()) {
+              // Consume the event here so StepShell's outer Enter-to-continue
+              // handler doesn't ALSO fire and advance the wizard.
+              e.preventDefault();
+              e.stopPropagation();
               onToggle(custom.trim().toLowerCase());
               setCustom("");
             }
@@ -68,6 +74,7 @@ export default function TonePicker({ selected, onToggle }: Props) {
           className="flex-1 bg-transparent border-b border-steel py-2 text-bone outline-none focus:border-spark transition-colors text-sm"
         />
         <button
+          type="button"
           onClick={() => {
             if (custom.trim()) {
               onToggle(custom.trim().toLowerCase());
