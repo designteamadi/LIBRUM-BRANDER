@@ -25,7 +25,9 @@ export default function ChannelPicker({ selected, onToggle }: Props) {
         return (
           <button
             key={c.key}
+            type="button"
             onClick={() => onToggle(c.key)}
+            aria-pressed={on}
             className={`chip p-5 border text-left transition-all ${
               on ? "border-spark bg-spark/5" : "border-steel hover:border-ash"
             }`}
