@@ -21,7 +21,9 @@ export default function LogoStylePicker({ selected, onSelect }: Props) {
         return (
           <button
             key={o.key}
+            type="button"
             onClick={() => onSelect(o.key)}
+            aria-pressed={on}
             className={`chip p-5 border text-left transition-all ${
               on ? "border-spark bg-spark/5" : "border-steel hover:border-ash"
             }`}
