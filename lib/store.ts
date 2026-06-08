@@ -64,6 +64,7 @@ type State = {
   updateBrandDontExamples: (examples: (string | undefined)[]) => void;
   updateCampaignMockup: (idx: number, dataUrl: string) => void;
   updateCampaignCover: (dataUrl: string) => void;
+  updateCampaignLogo: (dataUrl: string) => void;
   reset: () => void;
 };
 
@@ -178,6 +179,16 @@ export const useBRND = create<State>()(
             generatedCampaign: {
               ...s.generatedCampaign,
               coverImageDataUrl: dataUrl,
+            },
+          };
+        }),
+      updateCampaignLogo: (dataUrl) =>
+        set((s) => {
+          if (!s.generatedCampaign) return s;
+          return {
+            generatedCampaign: {
+              ...s.generatedCampaign,
+              campaignLogoDataUrl: dataUrl,
             },
           };
         }),
