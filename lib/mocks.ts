@@ -190,6 +190,16 @@ export const mockBrandSuggestions = (b: BrandInput) => ({
     `EDITORIAL DIGITAL BANNER for ${b.businessName}, 16:9 horizontal, wide marquee composition as it would appear at the top of the brand's website, strong central subject with editorial typography composition and brand wordmark prominent. Cinematic.`,
     `BRAND ENVIRONMENT for ${b.businessName}, 1:1 square, the brand brought to life in a physical space — retail interior, branded storefront, exhibition booth, or hero product display in context. Architectural feel, materials and ambient lighting deliberate.`,
   ],
+  mockupDescriptions: [
+    `Hero application pairs the mark with the brand's defining product — proof the identity carries a premium, editorial moment.`,
+    `Social shows the system in a lived feed: one strong subject, palette intact, the wordmark sitting naturally in frame.`,
+    `Poster treats type and image as one composition — the announcement voice of the brand at large scale.`,
+    `Out-of-home tests the identity at distance and speed: legible, confident, unmistakable in the wild.`,
+    `Collateral proves the mark holds across small, tactile touchpoints — cards, stationery, packaging.`,
+    `Photography sets the brand's way of seeing — color, depth, and mood that every future shoot inherits.`,
+    `The editorial banner is the brand's marquee voice on screen — wide, cinematic, wordmark-forward.`,
+    `Environment lands the identity in physical space, across surfaces and materials, exactly as a visitor meets it.`,
+  ],
 });
 
 export const mockBrandPersona = (b: BrandInput) => ({
@@ -238,16 +248,25 @@ export const mockCampaignSuggestions = (c: CampaignInput) => ({
     `Warm sunset campaign visual for "${c.campaignName}", ember tones, lived-in.`,
     `Cool minimal campaign visual for "${c.campaignName}", ocean palette, daylight clean.`,
   ],
-  mockupPrompts: [
-    `HERO campaign visual for "${c.campaignName}", 9:16 vertical, cinematic, on-message, the defining lead image for the launch announcement. ${c.brandName} mark visible if it fits naturally.`,
-    `SOCIAL POST for "${c.campaignName}", 1:1 square, a real-feeling Instagram still showing ${c.targetMarket || "the audience"} encountering the campaign in a lifestyle moment. ${c.brandName} wordmark visible.`,
-    `STORY/REEL frame for "${c.campaignName}", 9:16 vertical, a single bold thumb-stop composition designed for Instagram Stories / TikTok feed.`,
-    `POSTER for "${c.campaignName}", 2:3 portrait, editorial campaign poster as if wheat-pasted to an urban wall, headline integrated into the composition, photographic feel.`,
-    `PHOTO MOODBOARD for "${c.campaignName}", 1:1 square, a single hero editorial photograph that defines the campaign's visual style — color, energy, human moment.`,
-    `OOH for "${c.campaignName}", 16:9 horizontal, the campaign applied to a real-world billboard or transit surface, photographed in situ at street level.`,
-    `DIGITAL BANNER for "${c.campaignName}", 16:9 horizontal, wide marquee composition as it would appear at the top of a website or in an in-app sponsored placement, strong central subject with the campaign headline composed editorially. ${c.brandName} wordmark prominent.`,
-    `CAMPAIGN ACTIVATION for "${c.campaignName}", 1:1 square, the campaign brought to life in a physical experience — pop-up activation, branded installation, event stage, immersive moment. Architectural feel, ambient lighting deliberate.`,
-  ],
+  channelPlans: Object.fromEntries(
+    c.channels.map((ch) => [
+      ch,
+      {
+        location: `A high-traffic ${ch} placement where ${
+          c.targetMarket || "the audience"
+        } already spends attention.`,
+        context: `${c.campaignName || "The campaign"} on ${ch}`,
+        rationale: `Meeting the audience on ${ch} lets the campaign answer a real doubt at the exact moment it surfaces — turning a question into a reason to choose ${c.brandName}.`,
+        hook: `Is ${c.brandName} really worth it?`,
+        executions: [
+          `Campaign execution for "${c.campaignName}" on ${ch}: an on-message scene with ${
+            c.targetMarket || "a lifestyle subject"
+          }, ${c.brandName} present naturally, editorial lighting, the headline carried in the composition.`,
+          `Alternate ${ch} execution for "${c.campaignName}": a different angle on the same idea, strong single subject, campaign energy, ${c.brandName} mark visible.`,
+        ],
+      },
+    ])
+  ),
 });
 
 export const mockCampaignPersona = (c: CampaignInput) => ({
