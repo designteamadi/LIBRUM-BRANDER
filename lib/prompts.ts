@@ -59,10 +59,20 @@ Return JSON only, no commentary:
     "PHOTOGRAPHY DIRECTION (1:1 square). A single hero photograph that defines the brand's photographic style — subject, color treatment, depth, mood. Editorial, not stock. No text overlays. The image should answer 'how does this brand see the world?'",
     "EDITORIAL DIGITAL BANNER (16:9 horizontal). A wide marquee banner as it would appear at the top of the brand's website or in a sponsored magazine spread — strong central subject with editorial typography composition, brand wordmark prominent, dramatic lighting. Cinematic wide composition.",
     "BRAND ENVIRONMENT (1:1 square). The brand brought to life in a physical space — retail interior, branded storefront, exhibition booth, signage, or hero product display in context. Architectural feel, attention to materials and ambient lighting, brand identity visible across multiple surfaces."
+  ],
+  "mockupDescriptions": [
+    "one short case-study sentence (max 22 words) describing the hero product application and why it works for this brand",
+    "same for the social post surface",
+    "same for the print poster",
+    "same for the OOH billboard",
+    "same for the brand collateral",
+    "same for the photography direction",
+    "same for the editorial digital banner",
+    "same for the brand environment"
   ]
 }
 
-Provide exactly 3 palettes, 3 typography pairings, 3 concept thumbnail prompts (one per palette), and 8 mockup prompts (one for each labeled surface, in the order shown). Use only real, currently available Google Fonts for typography. Make image prompts photographic, specific, and on-brief — include lighting, framing, surface, and the brand name where natural. The conceptThumbnailPrompts should each represent the matching palette's mood visually.
+Provide exactly 3 palettes, 3 typography pairings, 3 concept thumbnail prompts (one per palette), 8 mockup prompts, and 8 mockupDescriptions (one short case-study line per mockup, same index order). The mockupDescriptions are written in ${languageName(b.outputLanguage)} and read like the explanatory copy in a design case study ("Hero application pairs the mark with…"). Use only real, currently available Google Fonts for typography. Make image prompts photographic, specific, and on-brief — include lighting, framing, surface, and the brand name where natural. The conceptThumbnailPrompts should each represent the matching palette's mood visually.
 `.trim();
 
 export const brandPersonaPrompt = (b: BrandInput, p: ColorPalette) => `
@@ -192,19 +202,28 @@ Return JSON only:
     "same for palette 2",
     "same for palette 3"
   ],
-  "mockupPrompts": [
-    "HERO CAMPAIGN VISUAL (9:16 vertical, cinematic). The defining campaign image — what would be the lead asset in a launch announcement. Editorial lighting, on-message, brand name visible if it fits naturally on a surface. Magazine cover feel.",
-    "SOCIAL POST (1:1 square). A real-feeling on-brand Instagram-style still that lives in a feed. Specific scene from the campaign, lifestyle subject, brand name visible somewhere natural. Should belong on a curated editorial account.",
-    "STORY / REEL FRAME (9:16 vertical). A vertical video poster-frame as it would appear in Instagram Stories or TikTok — single bold composition designed for thumb-stop, brand mark layered into the composition. Strong central subject.",
-    "CAMPAIGN POSTER (2:3 portrait). An editorial campaign poster as if wheat-pasted to an urban wall or pinned in a gallery — typographic + photographic composition with the campaign headline integrated visually. Print-feel, slight texture.",
-    "PHOTO MOODBOARD (1:1 square). A single hero photograph that defines this campaign's visual style — the color, the energy, the type of human moment it captures. Editorial, not stock. No text overlays.",
-    "OOH BILLBOARD (16:9 horizontal). The campaign applied to a real-world out-of-home surface — billboard, transit, kiosk, projection — photographed in situ at street level with environmental context (city, sky, passers-by).",
-    "DIGITAL BANNER (16:9 horizontal). A wide marquee banner as it would appear at the top of a website, in-app sponsored placement, or magazine digital spread — strong central subject with the campaign headline composed editorially, brand wordmark prominent. Cinematic wide composition.",
-    "CAMPAIGN ACTIVATION (1:1 square). The campaign brought to life in a physical experience — pop-up activation, branded installation, event stage, immersive moment. Architectural feel, attention to materials and ambient lighting, campaign identity visible across the space."
-  ]
+  "channelPlans": {
+    "instagram": {
+      "location": "where this lives, specific (e.g. in-feed on the brand's IG)",
+      "context": "the thematic angle for this channel",
+      "rationale": "one or two sentences on why this placement carries the message",
+      "hook": "a short contextual question or worry the audience has (under 9 words)",
+      "executions": [
+        "photographic prompt for a primary execution on this channel — specific scene, lighting, subject, on-message; the campaign idea made real",
+        "an alternate execution prompt for the same channel (different scene/angle)"
+      ]
+    },
+    "tiktok": { "location": "", "context": "", "rationale": "", "hook": "", "executions": [] },
+    "youtube": { "location": "", "context": "", "rationale": "", "hook": "", "executions": [] },
+    "ooh": { "location": "", "context": "", "rationale": "", "hook": "", "executions": [] },
+    "print": { "location": "", "context": "", "rationale": "", "hook": "", "executions": [] },
+    "web": { "location": "", "context": "", "rationale": "", "hook": "", "executions": [] },
+    "email": { "location": "", "context": "", "rationale": "", "hook": "", "executions": [] },
+    "radio": { "location": "", "context": "", "rationale": "", "hook": "", "executions": [] }
+  }
 }
 
-Provide exactly 3 palettes, 3 typography pairings, 3 concept thumbnail prompts, and 8 mockup prompts (one for each labeled surface, in the order shown). Only fill channelIdeas keys that are in the selected channels list above; for others, return an empty string. Photographic prompts only — include lighting, framing, subject, and reference the campaign message visually.
+Provide exactly 3 palettes, 3 typography pairings, and 3 concept thumbnail prompts. Fill channelIdeas AND channelPlans ONLY for the channels in the selected channels list above; for every other channel return empty strings and an empty executions array. For each SELECTED channel, write 2 distinct execution prompts (photographic, specific, on-message, referencing the campaign idea visually), plus its location, context, rationale, and a contextual hook question. For non-visual channels (radio, email) the executions may be empty — location/context/rationale/hook still matter. All copy (location, context, rationale, hook, headlines, channelIdeas) in ${languageName(c.outputLanguage)}; keep font names in English.
 `.trim();
 
 export const campaignPersonaPrompt = (c: CampaignInput, p: ColorPalette) => `
@@ -314,3 +333,17 @@ export const logoImagePrompt = (b: BrandInput) => {
 /** Prompt for compositing brand logo onto a mockup scene */
 export const logoCompositePrompt = (basePrompt: string, brandName: string) =>
   `${basePrompt}\n\nIMPORTANT: Take the brand logo from the provided image and integrate it naturally into the scene as the visible brand identity for "${brandName}" — apply it to the relevant product surface, packaging, signage, or apparel in a way that feels real and physically consistent with the lighting and perspective. Do not redraw the logo; preserve its proportions and style.`;
+
+/**
+ * Prompt for the campaign's OWN title logo — a generated wordmark/lockup for
+ * the campaign name itself, distinct from the parent brand logo. Used in the
+ * campaign bento hero and on the playbook cover.
+ */
+export const campaignLogoImagePrompt = (c: CampaignInput) =>
+  `Studio-quality vector-style campaign title logo / wordmark for the campaign named "${
+    c.campaignName || c.brandName
+  }". A custom-set typographic lockup of the campaign name — expressive, modern, memorable, suitable as the campaign's signature mark. ${
+    c.campaignPurpose ? `Campaign purpose: ${c.campaignPurpose}. ` : ""
+  }Evocative of: ${
+    c.toneKeywords.join(", ") || "bold, contemporary"
+  }. Clean, flat, high-contrast, centered, on a plain white or transparent-looking background. No photographic elements, no mascot, no busy background — just the campaign wordmark as a crisp logo.`;
