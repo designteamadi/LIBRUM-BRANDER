@@ -11,12 +11,20 @@ import LanguagePicker from "@/components/LanguagePicker";
 import RefineBar from "@/components/RefineBar";
 import { useBRND } from "@/lib/store";
 import { archetypeByKey } from "@/lib/archetypes";
+import {
+  planCampaignImageTiles,
+  nonVisualChannels,
+  CHANNEL_META,
+} from "@/lib/placements";
+import { campaignLogoImagePrompt } from "@/lib/prompts";
 import type {
   ColorPalette,
   TypePairing,
   Persona,
   GeneratedCampaign,
   MediaChannel,
+  ChannelPlan,
+  CampaignPlacementTile,
 } from "@/lib/types";
 
 const TOTAL = 9;
@@ -28,7 +36,7 @@ type Suggestions = {
   cta: string;
   channelIdeas: Record<MediaChannel, string>;
   conceptThumbnailPrompts: string[];
-  mockupPrompts: string[];
+  channelPlans?: Partial<Record<MediaChannel, ChannelPlan>>;
 };
 
 export default function CampaignFlow() {
@@ -276,18 +284,22 @@ export default function CampaignFlow() {
       // immediately. Cover image — playbook-only — is background-gen on
       // /result so the bento appears faster.
       //
-      // 6 mockup slots (matching the prompt categories from /api/reason):
-      //   slot 0: HERO          9:16
-      //   slot 1: SOCIAL POST   1:1
-      //   slot 2: STORY/REEL    9:16
-      //   slot 3: POSTER        2:3
-      //   slot 4: PHOTO MOOD    1:1
-      //   slot 5: OOH           16:9
-      //   slot 6: DIGITAL BANNER  16:9  (new — web/in-app marquee banner)
-      //   slot 7: CAMPAIGN ACTIVATION 1:1 (new — pop-up/installation/event)
-      const prompts = (suggestions.mockupPrompts || []).slice(0, 8);
+      // -------- Channel-driven placement plan --------
+      // The campaign bento visualizes each SELECTED media placement. Visual
+      // channels get generated images (capped at 12, going deep when few
+      // channels are picked and wide when many); radio/email become
+      // code-composed cards. We also generate the campaign's OWN title logo.
       const userLogo = campaign.logoDataUrl;
-      const MOCKUP_ASPECTS = ["9:16", "1:1", "9:16", "2:3", "1:1", "16:9", "16:9", "1:1"];
+      const channelPlans: Partial<Record<MediaChannel, ChannelPlan>> =
+        suggestions.channelPlans ?? {};
+
+      const imageSpecs = planCampaignImageTiles(campaign.channels);
+      const composedChannels = nonVisualChannels(campaign.channels);
+
+      const compositeInstruction = (p: string) =>
+        userLogo
+          ? `${p}\n\nIMPORTANT: Apply the brand logo from the provided image naturally onto the visible product/surface/sign in this scene — preserve its proportions; match the lighting and perspective.`
+          : p;
 
       const buildImageReq = (
         prompt: string,
@@ -306,7 +318,48 @@ export default function CampaignFlow() {
           .then((r) => r.json())
           .catch(() => ({ dataUrl: undefined }));
 
-      const [personaRes, imgResults] = await Promise.all([
+      // Resolve each image spec into a prompt + a placement descriptor.
+      const imageTiles = imageSpecs.map((spec) => {
+        const plan = channelPlans[spec.channel];
+        const execs = (plan?.executions ?? []).filter(Boolean);
+        const meta = CHANNEL_META[spec.channel];
+        const basePrompt = execs.length
+          ? execs[spec.execIndex % execs.length]
+          : `Campaign visual for "${campaign.campaignName || campaign.brandName}" — ${spec.label}. On-message, editorial lighting, strong single subject, ${campaign.brandName} present naturally.`;
+        const placement: CampaignPlacementTile = {
+          channel: spec.channel,
+          label: spec.label,
+          location: plan?.location || meta?.label || spec.channel,
+          context: plan?.context || campaign.campaignName || "",
+          rationale: plan?.rationale || "",
+          hook: plan?.hook || "",
+          aspect: spec.aspect,
+          composed: false,
+        };
+        return { prompt: basePrompt, aspect: spec.aspect, placement };
+      });
+
+      // Non-visual channels (radio/email) → code-composed placement cards.
+      const composedTiles = composedChannels.map((ch) => {
+        const plan = channelPlans[ch];
+        const meta = CHANNEL_META[ch];
+        const placement: CampaignPlacementTile = {
+          channel: ch,
+          label: meta?.label || ch,
+          location: plan?.location || meta?.label || ch,
+          context: plan?.context || campaign.campaignName || "",
+          rationale:
+            plan?.rationale ||
+            (suggestions.channelIdeas?.[ch] ?? "") ||
+            "",
+          hook: plan?.hook || "",
+          aspect: meta?.aspect || "1:1",
+          composed: true,
+        };
+        return { placement };
+      });
+
+      const [personaRes, campaignLogoRes, imgResults] = await Promise.all([
         fetch("/api/reason", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -316,13 +369,13 @@ export default function CampaignFlow() {
             palette: selectedPalette,
           }),
         }),
+        // Campaign's own title logo — no compositing, transparent-ish bg.
+        buildImageReq(campaignLogoImagePrompt(campaign), "1:1", false),
         Promise.all(
-          prompts.map((p, i) =>
+          imageTiles.map((t) =>
             buildImageReq(
-              userLogo
-                ? `${p}\n\nIMPORTANT: Apply the brand logo from the provided image naturally onto the visible product/surface/sign in this scene — preserve its proportions; match the lighting and perspective.`
-                : p,
-              MOCKUP_ASPECTS[i] || "1:1",
+              compositeInstruction(t.prompt),
+              t.aspect,
               Boolean(userLogo)
             )
           )
@@ -370,6 +423,20 @@ export default function CampaignFlow() {
         );
       }
 
+      // Stitch image tiles + composed tiles into index-aligned arrays.
+      const placements: CampaignPlacementTile[] = [
+        ...imageTiles.map((t) => t.placement),
+        ...composedTiles.map((t) => t.placement),
+      ];
+      const mockupPrompts = [
+        ...imageTiles.map((t) => t.prompt),
+        ...composedTiles.map(() => ""),
+      ];
+      const mockupImages: (string | undefined)[] = [
+        ...imgResults.map((r) => r?.dataUrl),
+        ...composedTiles.map(() => undefined),
+      ];
+
       const generated: GeneratedCampaign = {
         input: campaign,
         palettes: suggestions.palettes,
@@ -381,14 +448,18 @@ export default function CampaignFlow() {
         cta: suggestions.cta ?? "",
         channelIdeas:
           suggestions.channelIdeas ?? ({} as Record<MediaChannel, string>),
-        mockupPrompts: prompts,
-        mockupImages: imgResults.map((r) => r?.dataUrl),
+        mockupPrompts,
+        mockupImages,
+        placements,
+        campaignLogoDataUrl: campaignLogoRes?.dataUrl,
         // coverImageDataUrl is filled in by background generation on /result.
       };
       setGeneratedCampaign(generated);
       // eslint-disable-next-line no-console
       console.log("[finalize:campaign] success → /result", {
-        mockupCount: imgResults.filter((r) => r?.dataUrl).length,
+        placementCount: placements.length,
+        imageCount: imgResults.filter((r) => r?.dataUrl).length,
+        hasCampaignLogo: Boolean(campaignLogoRes?.dataUrl),
         hasLogo: Boolean(userLogo),
         usedSyntheticPersona: !validPersona,
       });
