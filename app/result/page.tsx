@@ -216,13 +216,17 @@ Aspect ratio: 3:2 landscape.`;
     if (!prompt) return;
     // Per-slot aspect ratios must match what the initial finalize used,
     // so a regenerated tile arrives in the same shape as the bento expects.
-    // Brand:    [0]9:16 [1]1:1 [2]2:3 [3]16:9 [4]4:3 [5]1:1 [6]16:9 [7]1:1
-    // Campaign: [0]9:16 [1]1:1 [2]9:16 [3]2:3 [4]1:1 [5]16:9 [6]16:9 [7]1:1
+    // Campaign tiles carry their own aspect on the placement descriptor;
+    // brand uses the fixed surface order.
     const brandAspects = ["9:16", "1:1", "2:3", "16:9", "4:3", "1:1", "16:9", "1:1"] as const;
-    const campaignAspects = ["9:16", "1:1", "9:16", "2:3", "1:1", "16:9", "16:9", "1:1"] as const;
-    const aspectRatio = isCampaign
-      ? (campaignAspects[idx] ?? "1:1")
-      : (brandAspects[idx] ?? "1:1");
+    let aspectRatio: string;
+    if (isCampaign) {
+      const placement = c!.placements?.[idx];
+      if (placement?.composed) return; // code-composed card, nothing to regen
+      aspectRatio = placement?.aspect ?? "1:1";
+    } else {
+      aspectRatio = brandAspects[idx] ?? "1:1";
+    }
     const body = {
       prompt: logoForComposite
         ? `${prompt}\n\nIMPORTANT: Apply the brand logo from the provided image naturally onto the visible product/surface in this scene — preserve its proportions; match lighting and perspective.`
@@ -271,9 +275,18 @@ Aspect ratio: 3:2 landscape.`;
       <header className="px-8 py-6 flex items-center justify-between border-b border-steel/40 sticky top-0 bg-noir/85 backdrop-blur-md z-30">
         <Link
           href="/"
-          className="font-mono text-xs tracking-[0.22em] uppercase link-underline"
+          className="flex items-center gap-2.5 group"
+          aria-label="LIBRUM Brander — home"
         >
-          BRND
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/librum-logotype.png"
+            alt="LIBRUM"
+            className="h-5 w-auto object-contain"
+          />
+          <span className="font-mono text-[11px] tracking-[0.22em] uppercase text-ash group-hover:text-bone transition-colors">
+            — Brander
+          </span>
         </Link>
         <div className="font-mono text-[11px] tracking-[0.18em] uppercase text-ash">
           {isCampaign ? "Campaign" : "Brand"} · {languageNative(language)} · output
@@ -407,6 +420,9 @@ Aspect ratio: 3:2 landscape.`;
             cta={cta}
             channelIdeas={channelIdeas}
             logoDataUrl={logoForComposite}
+            mockupDescriptions={g?.mockupDescriptions}
+            placements={c?.placements}
+            campaignLogoDataUrl={c?.campaignLogoDataUrl}
             conceptThumbnails={(isCampaign ? c?.palettes : g?.palettes)?.map(
               (p) => p.conceptImageDataUrl
             )}
