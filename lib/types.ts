@@ -47,6 +47,40 @@ export type Persona = {
   traits: string[];
 };
 
+/**
+ * Per-channel campaign plan returned by the AI in campaign-suggestions.
+ * Drives the channel-specific placement tiles in the campaign bento and the
+ * Location / Context / rationale pages in the campaign playbook.
+ */
+export type ChannelPlan = {
+  /** where this placement physically lives, e.g. "MRT station concourse" */
+  location: string;
+  /** the thematic angle, e.g. "commuting" / "frequently asked question" */
+  context: string;
+  /** one or two sentences on why this placement carries the message */
+  rationale: string;
+  /** a short contextual hook/question the placement answers (speech-bubble) */
+  hook: string;
+  /** one to three photographic execution prompts for this channel */
+  executions: string[];
+};
+
+/**
+ * A single resolved placement tile in the campaign bento, index-aligned with
+ * GeneratedCampaign.mockupImages and .mockupPrompts. `composed` tiles
+ * (radio/email) carry no generated image — the bento renders a code card.
+ */
+export type CampaignPlacementTile = {
+  channel: MediaChannel;
+  label: string;
+  location: string;
+  context: string;
+  rationale: string;
+  hook: string;
+  aspect: string;
+  composed: boolean;
+};
+
 export type BrandInput = {
   businessName: string;
   industry: string;
@@ -100,6 +134,12 @@ export type GeneratedBrand = {
   patternIdea: string;
   mockupPrompts: string[];
   mockupImages: (string | undefined)[];
+  /**
+   * Per-applied-surface case-study copy (index-aligned with mockupImages):
+   * a short "what this is / why it works" line shown under each elevated
+   * bento panel and on each "in action" playbook page.
+   */
+  mockupDescriptions?: string[];
   /** Nano Banana 2-generated editorial hero image used as the playbook cover background. */
   coverImageDataUrl?: string;
   /**
@@ -122,8 +162,19 @@ export type GeneratedCampaign = {
   channelIdeas: Record<MediaChannel, string>;
   mockupPrompts: string[];
   mockupImages: (string | undefined)[];
+  /**
+   * Resolved placement tiles, index-aligned with mockupImages/mockupPrompts.
+   * Drives the channel-driven campaign bento and the playbook placement pages.
+   */
+  placements?: CampaignPlacementTile[];
   /** Nano Banana 2-generated editorial hero image used as the campaign-book cover. */
   coverImageDataUrl?: string;
+  /**
+   * The campaign's OWN title logo — a generated wordmark/lockup for the
+   * campaign name itself (distinct from the parent brand logo in input).
+   * Shown in the campaign bento hero/lockup and on the playbook cover.
+   */
+  campaignLogoDataUrl?: string;
 };
 
 export type ReasonRequest =
