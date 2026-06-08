@@ -28,6 +28,7 @@ type Suggestions = {
   patternIdea: string;
   conceptThumbnailPrompts: string[];
   mockupPrompts: string[];
+  mockupDescriptions?: string[];
 };
 
 export default function BrandFlow() {
@@ -415,6 +416,7 @@ export default function BrandFlow() {
         patternIdea: suggestions.patternIdea ?? "",
         mockupPrompts,
         mockupImages: mockupResults.map((r) => r?.dataUrl),
+        mockupDescriptions: (suggestions.mockupDescriptions || []).slice(0, 8),
         // coverImageDataUrl + logoDontExamples are deliberately omitted.
         // They get filled in by background-generation effects on /result.
       };
