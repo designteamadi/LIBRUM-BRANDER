@@ -409,25 +409,25 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
             alignItems: "flex-start",
           }}
         >
-          {/* The actual brand logo, shown prominently. If no logo image
-              exists, the wordmark below carries the cover on its own —
-              no photographic hero, no triangle fallback. */}
-          {props.logoImageDataUrl && (
+          {/* The actual brand logo carries the cover. When it exists we show
+              it prominently and suppress the typographic wordmark so the name
+              isn't shown twice. With no logo, the wordmark carries the cover. */}
+          {props.logoImageDataUrl ? (
             <Image
               src={props.logoImageDataUrl}
               style={{
-                maxWidth: 200,
-                height: 96,
+                maxWidth: 360,
+                height: 150,
                 objectFit: "contain",
-                marginBottom: 36,
+                marginBottom: 12,
               }}
             />
+          ) : (
+            <Text style={[styles.hero, { fontSize: 92, lineHeight: 0.95 }]}>
+              {props.name}
+              <Text style={styles.heroItalic}>.</Text>
+            </Text>
           )}
-
-          <Text style={[styles.hero, { fontSize: 92, lineHeight: 0.95 }]}>
-            {props.name}
-            <Text style={styles.heroItalic}>.</Text>
-          </Text>
 
           {props.tagline ? (
             <Text
