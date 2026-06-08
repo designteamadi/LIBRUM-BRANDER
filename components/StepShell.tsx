@@ -71,9 +71,18 @@ export default function StepShell({
       <header className="fixed top-0 left-0 right-0 z-30 px-8 py-6 flex items-center justify-between text-xs bg-noir/80 backdrop-blur-md border-b border-steel/40">
         <Link
           href="/"
-          className="font-mono tracking-[0.18em] uppercase text-bone link-underline"
+          className="flex items-center gap-2.5 group"
+          aria-label="LIBRUM Brander — home"
         >
-          BRND
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/librum-logotype.png"
+            alt="LIBRUM"
+            className="h-5 w-auto object-contain"
+          />
+          <span className="font-mono text-[11px] tracking-[0.18em] uppercase text-ash group-hover:text-bone transition-colors">
+            — Brander
+          </span>
         </Link>
         <div className="flex items-center gap-6 font-mono text-ash uppercase tracking-[0.14em]">
           <span>{flowLabel}</span>
