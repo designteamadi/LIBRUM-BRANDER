@@ -16,6 +16,7 @@ import type {
   MediaChannel,
   BrandInput,
   CampaignInput,
+  CampaignPlacementTile,
 } from "@/lib/types";
 import { archetypeByKey } from "@/lib/archetypes";
 
@@ -301,6 +302,8 @@ type BrandPlaybookProps = CommonProps & {
   toneKeywords: string[];
   /** Six bad-usage logo transformations for the "Don't" page. */
   logoDontExamples: (string | undefined)[];
+  /** Per-applied-surface case-study copy, index-aligned to mockupImages. */
+  mockupDescriptions?: string[];
 };
 
 type CampaignPlaybookProps = CommonProps & {
@@ -315,6 +318,10 @@ type CampaignPlaybookProps = CommonProps & {
   cta: string;
   channelIdeas: Record<MediaChannel, string>;
   toneKeywords: string[];
+  /** Resolved placement descriptors, index-aligned to mockupImages. */
+  placements?: CampaignPlacementTile[];
+  /** The campaign's own generated title logo (distinct from the brand logo). */
+  campaignLogoDataUrl?: string;
 };
 
 // ============================================================
@@ -329,7 +336,23 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
     hexes[2] || COLORS.bone,
     hexes[3] || COLORS.magenta,
   ];
-  const total = 17;
+  // Pages 1-14 are fixed; then one "in action" page per available mockup
+  // (up to 8), then the summary. Keep page numbering honest.
+  const inActionImages = props.mockupImages
+    .map((img, origIdx) => ({ img, origIdx }))
+    .filter((m) => Boolean(m.img))
+    .slice(0, 8);
+  const total = 15 + inActionImages.length;
+  const BRAND_SURFACE_LABELS = [
+    "hero · product",
+    "social · feed",
+    "print · poster",
+    "ooh · billboard",
+    "brand collateral",
+    "photography direction",
+    "editorial banner",
+    "brand environment",
+  ];
 
   // Derive 4 principles from tone keywords with safe defaults
   const tk = props.toneKeywords ?? [];
@@ -462,7 +485,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
         <PageHeader
           brand={props.name}
           section="contents"
-          pageNum="02 / 17"
+          pageNum={`02 / ${total}`}
         />
         <Text style={styles.sectionLabel}>navigation</Text>
         <Text style={styles.sectionTitle}>Contents.</Text>
@@ -524,7 +547,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
 
       {/* ============ 03 / BRAND ESSENCE ============ */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={props.name} section="essence" pageNum="03 / 17" />
+        <PageHeader brand={props.name} section="essence" pageNum={`03 / ${total}`} />
         <Text style={styles.sectionLabel}>03 — what we believe</Text>
         <Text style={styles.sectionTitle}>Brand essence.</Text>
         <Text style={styles.sectionSub}>
@@ -597,7 +620,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
 
       {/* ============ 04 / MISSION & AUDIENCE ============ */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={props.name} section="mission" pageNum="04 / 17" />
+        <PageHeader brand={props.name} section="mission" pageNum={`04 / ${total}`} />
         <Text style={styles.sectionLabel}>04 — why we exist</Text>
         <Text style={styles.sectionTitle}>Mission.</Text>
         <Text style={styles.sectionSub}>
@@ -641,7 +664,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
 
       {/* ============ 05 / STORY ============ */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={props.name} section="story" pageNum="05 / 17" />
+        <PageHeader brand={props.name} section="story" pageNum={`05 / ${total}`} />
         <Text style={styles.sectionLabel}>05 — narrative</Text>
         <Text style={styles.sectionTitle}>Story.</Text>
         <Text style={styles.sectionSub}>
@@ -680,7 +703,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
 
       {/* ============ 06 / LOGO / THE MARK (white bg) ============ */}
       <Page size="A4" style={styles.pageBone}>
-        <PageHeader brand={props.name} section="lockup" pageNum="06 / 17" light />
+        <PageHeader brand={props.name} section="lockup" pageNum={`06 / ${total}`} light />
         <Text style={[styles.sectionLabel, { color: COLORS.magenta }]}>
           06 — primary lockup
         </Text>
@@ -770,7 +793,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
         <PageHeader
           brand={props.name}
           section="logo system"
-          pageNum="07 / 17"
+          pageNum={`07 / ${total}`}
         />
         <Text style={styles.sectionLabel}>07 — variations</Text>
         <Text style={styles.sectionTitle}>Logo system.</Text>
@@ -833,7 +856,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
           paired with a red "X" mark and a label. If a specific example
           failed to generate, fall back to a magenta block + cross. */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={props.name} section="logo / dont" pageNum="08 / 17" />
+        <PageHeader brand={props.name} section="logo / dont" pageNum={`08 / ${total}`} />
         <Text style={styles.sectionLabel}>08 — rules</Text>
         <Text style={styles.sectionTitle}>Don't.</Text>
         <Text style={styles.sectionSub}>
@@ -945,7 +968,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
 
       {/* ============ 09 / COLOR SYSTEM ============ */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={props.name} section="color" pageNum="09 / 17" />
+        <PageHeader brand={props.name} section="color" pageNum={`09 / ${total}`} />
         <Text style={styles.sectionLabel}>09 — palette · {p.name}</Text>
         <Text style={styles.sectionTitle}>Color system.</Text>
         <Text style={styles.sectionSub}>{p.rationale || "Our color system."}</Text>
@@ -1035,7 +1058,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
 
       {/* ============ 10 / COLOR HIERARCHY ============ */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={props.name} section="color hierarchy" pageNum="10 / 17" />
+        <PageHeader brand={props.name} section="color hierarchy" pageNum={`10 / ${total}`} />
         <Text style={styles.sectionLabel}>10 — proportions</Text>
         <Text style={styles.sectionTitle}>Hierarchy.</Text>
         <Text style={styles.sectionSub}>
@@ -1179,7 +1202,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
 
       {/* ============ 11 / TYPOGRAPHY SPECIMEN ============ */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={props.name} section="type" pageNum="11 / 17" />
+        <PageHeader brand={props.name} section="type" pageNum={`11 / ${total}`} />
         <Text style={styles.sectionLabel}>11 — specimen</Text>
         <Text style={styles.sectionTitle}>Typography.</Text>
         <Text style={styles.sectionSub}>{props.type.rationale}</Text>
@@ -1259,7 +1282,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
 
       {/* ============ 12 / TYPOGRAPHY HIERARCHY ============ */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={props.name} section="type hierarchy" pageNum="12 / 17" />
+        <PageHeader brand={props.name} section="type hierarchy" pageNum={`12 / ${total}`} />
         <Text style={styles.sectionLabel}>12 — scale</Text>
         <Text style={styles.sectionTitle}>Hierarchy.</Text>
         <Text style={styles.sectionSub}>
@@ -1327,7 +1350,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
 
       {/* ============ 13 / VOICE & PERSONA ============ */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={props.name} section="voice" pageNum="13 / 17" />
+        <PageHeader brand={props.name} section="voice" pageNum={`13 / ${total}`} />
         <Text style={styles.sectionLabel}>13 — who we sound like</Text>
         <Text style={styles.sectionTitle}>{props.persona.name}.</Text>
         <Text style={styles.sectionSub}>
@@ -1367,7 +1390,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
 
       {/* ============ 14 / VOICE DO / DON'T ============ */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={props.name} section="voice / do dont" pageNum="14 / 17" />
+        <PageHeader brand={props.name} section="voice / do dont" pageNum={`14 / ${total}`} />
         <Text style={styles.sectionLabel}>14 — voice rules</Text>
         <Text style={styles.sectionTitle}>Do / Don't.</Text>
         <Text style={styles.sectionSub}>
@@ -1448,46 +1471,52 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
         <PageFooter brand={props.name} page={14} total={total} />
       </Page>
 
-      {/* ============ 16 / IN ACTION ============ */}
-      {props.mockupImages.filter(Boolean).slice(0, 3).map((img, i) => (
-        <Page key={`mock-${i}`} size="A4" style={styles.page}>
-          <PageHeader
-            brand={props.name}
-            section={`in action · ${String(i + 1).padStart(2, "0")}`}
-            pageNum={`${16}.${i + 1} / 17`}
-          />
-          <Text style={styles.sectionLabel}>
-            16.{i + 1} — applied · context {["primary", "secondary", "tertiary"][i]}
-          </Text>
-          <Text style={styles.sectionTitle}>In action.</Text>
-          {img && <Image src={img} style={styles.bigImage} />}
-          <Text
-            style={{
-              fontSize: 9,
-              color: COLORS.ash,
-              marginTop: 12,
-              letterSpacing: 0.4,
-              
-              fontFamily: "Helvetica-Oblique",
-            }}
-          >
-            {i === 0
-              ? "Hero application — full-bleed brand expression."
-              : i === 1
-              ? "Secondary application — product or context-in-use."
-              : "Tertiary application — lifestyle / brand-in-world."}
-          </Text>
-          <PageFooter brand={props.name} page={16} total={total} />
-        </Page>
-      ))}
+      {/* ============ IN ACTION ============
+          One page per available applied surface, each carrying its own
+          case-study line (mockupDescriptions), index-aligned to the
+          original mockup slots so the right copy meets the right image. */}
+      {inActionImages.map(({ img, origIdx }, i) => {
+        const pageNo = 15 + i;
+        const surface = BRAND_SURFACE_LABELS[origIdx] ?? "applied surface";
+        const caption =
+          props.mockupDescriptions?.[origIdx] ??
+          "Applied brand expression — the identity at work on a real surface.";
+        return (
+          <Page key={`mock-${origIdx}`} size="A4" style={styles.page}>
+            <PageHeader
+              brand={props.name}
+              section={`in action · ${String(i + 1).padStart(2, "0")}`}
+              pageNum={`${pageNo} / ${total}`}
+            />
+            <Text style={styles.sectionLabel}>
+              {pageNo} — applied · {surface}
+            </Text>
+            <Text style={styles.sectionTitle}>In action.</Text>
+            {img && <Image src={img} style={styles.bigImage} />}
+            <Text
+              style={{
+                fontSize: 10,
+                color: COLORS.ash,
+                marginTop: 12,
+                lineHeight: 1.45,
+                letterSpacing: 0.3,
+                fontFamily: "Helvetica-Oblique",
+              }}
+            >
+              {caption}
+            </Text>
+            <PageFooter brand={props.name} page={pageNo} total={total} />
+          </Page>
+        );
+      })}
 
       {/* ============ 17 / CLOSING BENTOBOX ============
           A single-page visual summary of everything in the book — like
           the on-screen Bento, condensed to one printable spread.
           Replaces the old moodboard + built-by + file-pack page. */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={props.name} section="summary" pageNum="17 / 17" />
-        <Text style={styles.sectionLabel}>17 — at a glance</Text>
+        <PageHeader brand={props.name} section="summary" pageNum={`${total} / ${total}`} />
+        <Text style={styles.sectionLabel}>{total} — at a glance</Text>
         <Text style={styles.sectionTitle}>The system.</Text>
         <Text style={[styles.sectionSub, { marginBottom: 16 }]}>
           Everything in this book, in one view. Tear this out, pin it up,
@@ -1791,7 +1820,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
           </Text>
         </View>
 
-        <PageFooter brand={props.name} page={17} total={total} />
+        <PageFooter brand={props.name} page={total} total={total} />
       </Page>
     </Document>
   );
@@ -1915,8 +1944,31 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
     hexes[2] || COLORS.bone,
     hexes[3] || COLORS.magenta,
   ];
-  const total = 14;
   const cName = props.campaignName || "Campaign";
+
+  // Pages 1-11 are fixed; then one placement page per resolved placement
+  // (Location / Context / rationale), then the summary. Fall back to the raw
+  // mockups if placements weren't provided (older saved state).
+  const placementPages: {
+    placement?: CampaignPlacementTile;
+    img?: string;
+    idx: number;
+  }[] =
+    props.placements && props.placements.length
+      ? props.placements
+          .map((placement, idx) => ({
+            placement,
+            img: props.mockupImages[idx],
+            idx,
+          }))
+          .filter((pp) => pp.placement.composed || Boolean(pp.img))
+          .slice(0, 12)
+      : props.mockupImages
+          .map((img, idx) => ({ img, idx }))
+          .filter((m) => Boolean(m.img))
+          .slice(0, 6)
+          .map((m) => ({ img: m.img, idx: m.idx }));
+  const total = 12 + placementPages.length;
 
   return (
     <Document
@@ -1940,16 +1992,16 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
         </View>
 
         {/* Logo-led lockup block */}
-        <View style={{ marginTop: 90, alignItems: "flex-start" }}>
-          {/* Parent brand logo, shown prominently */}
+        <View style={{ marginTop: 80, alignItems: "flex-start" }}>
+          {/* Parent brand logo — smaller, as an endorsement */}
           {props.logoImageDataUrl && (
             <Image
               src={props.logoImageDataUrl}
               style={{
-                maxWidth: 180,
-                height: 80,
+                maxWidth: 130,
+                height: 52,
                 objectFit: "contain",
-                marginBottom: 30,
+                marginBottom: 22,
               }}
             />
           )}
@@ -1960,19 +2012,33 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
               letterSpacing: 1.6,
               textTransform: "uppercase",
               color: COLORS.ash,
-              marginBottom: 10,
+              marginBottom: 14,
             }}
           >
             campaign · for {props.name}
           </Text>
 
+          {/* The campaign's OWN title logo, shown prominently. If absent
+              (e.g. mock mode), the wordmark below carries the cover. */}
+          {props.campaignLogoDataUrl && (
+            <Image
+              src={props.campaignLogoDataUrl}
+              style={{
+                maxWidth: 340,
+                height: 130,
+                objectFit: "contain",
+                marginBottom: 24,
+              }}
+            />
+          )}
+
           <Text
             style={{
               fontFamily: "Helvetica-Bold",
-              fontSize: 76,
+              fontSize: props.campaignLogoDataUrl ? 44 : 76,
               lineHeight: 0.95,
               letterSpacing: -1.5,
-              color: COLORS.bone,
+              color: props.campaignLogoDataUrl ? COLORS.ash : COLORS.bone,
             }}
           >
             {cName}
@@ -2016,7 +2082,7 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
 
       {/* ============ 02 / CONTENTS ============ */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={cName} section="contents" pageNum="02 / 14" />
+        <PageHeader brand={cName} section="contents" pageNum={`02 / ${total}`} />
         <Text style={styles.sectionLabel}>navigation</Text>
         <Text style={styles.sectionTitle}>Contents.</Text>
         <View style={{ marginTop: 28 }}>
@@ -2060,7 +2126,7 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
 
       {/* ============ 03 / THE BRIEF ============ */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={cName} section="brief" pageNum="03 / 14" />
+        <PageHeader brand={cName} section="brief" pageNum={`03 / ${total}`} />
         <Text style={styles.sectionLabel}>03 — the assignment</Text>
         <Text style={styles.sectionTitle}>The brief.</Text>
         <Text style={styles.sectionSub}>
@@ -2094,7 +2160,7 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
 
       {/* ============ 04 / AUDIENCE ============ */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={cName} section="audience" pageNum="04 / 14" />
+        <PageHeader brand={cName} section="audience" pageNum={`04 / ${total}`} />
         <Text style={styles.sectionLabel}>04 — who needs to hear this</Text>
         <Text style={styles.sectionTitle}>Audience.</Text>
         <Text style={styles.sectionSub}>
@@ -2117,7 +2183,7 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
 
       {/* ============ 05 / VOICE ============ */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={cName} section="voice" pageNum="05 / 14" />
+        <PageHeader brand={cName} section="voice" pageNum={`05 / ${total}`} />
         <Text style={styles.sectionLabel}>05 — who we sound like</Text>
         <Text style={styles.sectionTitle}>{props.persona.name}.</Text>
         <Text
@@ -2151,7 +2217,7 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
 
       {/* ============ 06 / VOICE DO/DON'T ============ */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={cName} section="voice / do dont" pageNum="06 / 14" />
+        <PageHeader brand={cName} section="voice / do dont" pageNum={`06 / ${total}`} />
         <Text style={styles.sectionLabel}>06 — voice rules</Text>
         <Text style={styles.sectionTitle}>Do / Don't.</Text>
         <Text style={styles.sectionSub}>
@@ -2227,7 +2293,7 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
 
       {/* ============ 07 / HEADLINES ============ */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={cName} section="headlines" pageNum="07 / 14" />
+        <PageHeader brand={cName} section="headlines" pageNum={`07 / ${total}`} />
         <Text style={styles.sectionLabel}>07 — messaging</Text>
         <Text style={styles.sectionTitle}>Headlines.</Text>
         <Text style={styles.sectionSub}>
@@ -2274,7 +2340,7 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
 
       {/* ============ 08 / CTA ============ */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={cName} section="cta" pageNum="08 / 14" />
+        <PageHeader brand={cName} section="cta" pageNum={`08 / ${total}`} />
         <Text style={styles.sectionLabel}>08 — primary call to action</Text>
         <Text style={styles.sectionTitle}>The ask.</Text>
         <Text style={styles.sectionSub}>
@@ -2324,7 +2390,7 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
 
       {/* ============ 09 / COLOR ============ */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={cName} section="color" pageNum="09 / 14" />
+        <PageHeader brand={cName} section="color" pageNum={`09 / ${total}`} />
         <Text style={styles.sectionLabel}>09 — palette · {p.name}</Text>
         <Text style={styles.sectionTitle}>Color.</Text>
         <Text style={styles.sectionSub}>{p.rationale}</Text>
@@ -2347,7 +2413,7 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
 
       {/* ============ 10 / TYPE ============ */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={cName} section="type" pageNum="10 / 14" />
+        <PageHeader brand={cName} section="type" pageNum={`10 / ${total}`} />
         <Text style={styles.sectionLabel}>10 — type system</Text>
         <Text style={styles.sectionTitle}>Typography.</Text>
         <Text style={styles.sectionSub}>{props.type.rationale}</Text>
@@ -2388,7 +2454,7 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
 
       {/* ============ 11 / CHANNEL ACTIVATIONS ============ */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={cName} section="channels" pageNum="11 / 14" />
+        <PageHeader brand={cName} section="channels" pageNum={`11 / ${total}`} />
         <Text style={styles.sectionLabel}>11 — channel-by-channel</Text>
         <Text style={styles.sectionTitle}>Channel activations.</Text>
         <Text style={styles.sectionSub}>
@@ -2445,28 +2511,88 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
       </Page>
 
       {/* ============ 12-13 / VISUALS ============ */}
-      {props.mockupImages.filter(Boolean).slice(0, 2).map((img, i) => (
-        <Page key={`viz-${i}`} size="A4" style={styles.page}>
-          <PageHeader
-            brand={cName}
-            section={`visual · ${String(i + 1).padStart(2, "0")}`}
-            pageNum={`${12 + i} / 14`}
-          />
-          <Text style={styles.sectionLabel}>
-            {12 + i} — applied · {i === 0 ? "primary" : "secondary"}
-          </Text>
-          <Text style={styles.sectionTitle}>In action.</Text>
-          {img && <Image src={img} style={styles.bigImage} />}
-          <PageFooter brand={cName} page={12 + i} total={total} />
-        </Page>
-      ))}
+      {/* ============ PLACEMENTS ============
+          One page per media placement. Each carries the generated visual (or
+          a composed card for radio/email) plus its Location / Context /
+          rationale — every page explains where it lives and why. */}
+      {placementPages.map((pp, i) => {
+        const pageNo = 12 + i;
+        const pl = pp.placement;
+        const label = pl?.label ?? `placement ${i + 1}`;
+        return (
+          <Page key={`plc-${pp.idx}`} size="A4" style={styles.page}>
+            <PageHeader
+              brand={cName}
+              section={`placement · ${String(i + 1).padStart(2, "0")}`}
+              pageNum={`${pageNo} / ${total}`}
+            />
+            <Text style={styles.sectionLabel}>
+              {pageNo} — {label}
+            </Text>
+            <Text style={styles.sectionTitle}>In action.</Text>
+
+            {pp.img ? (
+              <Image src={pp.img} style={styles.bigImage} />
+            ) : (
+              // Composed (radio/email) — no generated image: a typographic card.
+              <View
+                style={{
+                  backgroundColor: c0,
+                  padding: 22,
+                  marginTop: 6,
+                  minHeight: 150,
+                  justifyContent: "center",
+                  borderWidth: 0.5,
+                  borderColor: COLORS.steel,
+                }}
+              >
+                <Text style={{ fontSize: 9, letterSpacing: 1.4, textTransform: "uppercase", color: c1, marginBottom: 8 }}>
+                  {pl?.channel === "radio" ? "30s spot · script" : "email · inbox"}
+                </Text>
+                {pl?.hook ? (
+                  <Text style={{ fontFamily: "Times-Italic", fontSize: 18, color: COLORS.bone, marginBottom: 8 }}>
+                    {`"${pl.hook}"`}
+                  </Text>
+                ) : null}
+                <Text style={{ fontSize: 11, lineHeight: 1.5, color: COLORS.bone }}>
+                  {pl?.rationale || "A single clear line, the mnemonic, and one decisive call to action."}
+                </Text>
+              </View>
+            )}
+
+            {/* Location / Context / rationale — the two-column explainer */}
+            {pl && (
+              <View style={{ flexDirection: "row", gap: 18, marginTop: 14 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.eyebrow, { marginBottom: 3 }]}>location</Text>
+                  <Text style={{ fontSize: 10, lineHeight: 1.4, color: COLORS.bone, marginBottom: 10 }}>
+                    {pl.location || "—"}
+                  </Text>
+                  <Text style={[styles.eyebrow, { marginBottom: 3 }]}>context</Text>
+                  <Text style={{ fontSize: 10, lineHeight: 1.4, color: COLORS.bone }}>
+                    {pl.context || "—"}
+                  </Text>
+                </View>
+                <View style={{ flex: 1.4 }}>
+                  <Text style={[styles.eyebrow, { marginBottom: 3 }]}>why this placement</Text>
+                  <Text style={{ fontSize: 10, lineHeight: 1.5, color: COLORS.ash }}>
+                    {pl.rationale || "—"}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            <PageFooter brand={cName} page={pageNo} total={total} />
+          </Page>
+        );
+      })}
 
       {/* ============ 14 / CLOSING BENTOBOX ============
           A single-page visual summary of the campaign — mirror of the
           brand-book closing page. */}
       <Page size="A4" style={styles.page}>
-        <PageHeader brand={cName} section="summary" pageNum="14 / 14" />
-        <Text style={styles.sectionLabel}>14 — at a glance</Text>
+        <PageHeader brand={cName} section="summary" pageNum={`${total} / ${total}`} />
+        <Text style={styles.sectionLabel}>{total} — at a glance</Text>
         <Text style={styles.sectionTitle}>The campaign.</Text>
         <Text style={[styles.sectionSub, { marginBottom: 16 }]}>
           Everything in this campaign book, in one view. Pin it up and run.
@@ -2737,7 +2863,7 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
           </Text>
         </View>
 
-        <PageFooter brand={cName} page={14} total={total} />
+        <PageFooter brand={cName} page={total} total={total} />
       </Page>
     </Document>
   );
@@ -2780,6 +2906,7 @@ export function buildBrandPlaybook(g: GeneratedBrand, languageNative: string) {
       logoImageDataUrl={g.logoImageDataUrl}
       coverImageDataUrl={g.coverImageDataUrl}
       logoDontExamples={g.logoDontExamples ?? []}
+      mockupDescriptions={g.mockupDescriptions ?? []}
       language={languageNative}
     />
   );
@@ -2812,6 +2939,8 @@ export function buildCampaignPlaybook(
       conceptThumbnails={g.palettes.map((p) => p.conceptImageDataUrl)}
       logoImageDataUrl={g.input.logoDataUrl}
       coverImageDataUrl={g.coverImageDataUrl}
+      placements={g.placements}
+      campaignLogoDataUrl={g.campaignLogoDataUrl}
       language={languageNative}
     />
   );
