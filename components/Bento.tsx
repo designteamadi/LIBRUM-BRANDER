@@ -207,14 +207,17 @@ export default function Bento(props: Props) {
           </div>
 
           <div className="relative z-10 flex items-end gap-5 md:gap-7">
-            {/* Brand: brand logo. Campaign: the campaign's own title logo. */}
+            {/* Brand: brand logo. Campaign: the campaign's own title logo.
+                When a logo exists it carries the lockup on its own — the
+                typographic wordmark is suppressed so we don't show the name
+                twice. */}
             {kind === "brand" && logoDataUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={logoDataUrl}
                 alt={`${name} logo`}
-                className="h-16 md:h-24 w-auto object-contain shrink-0"
-                style={{ maxWidth: 120 }}
+                className="h-20 md:h-32 w-auto object-contain shrink-0"
+                style={{ maxWidth: 420 }}
               />
             )}
             {kind === "campaign" && campaignLogoDataUrl && (
@@ -226,9 +229,13 @@ export default function Bento(props: Props) {
                 style={{ maxWidth: 260 }}
               />
             )}
-            {/* When the campaign has its own logo, the name sits as a small
-                caption under it; otherwise the typographic name carries the lockup. */}
-            {!(kind === "campaign" && campaignLogoDataUrl) && (
+            {/* Typographic wordmark — only when there's no logo to carry the
+                lockup (brand without an uploaded/generated mark, or campaign
+                without its own title logo). */}
+            {!(
+              (kind === "brand" && logoDataUrl) ||
+              (kind === "campaign" && campaignLogoDataUrl)
+            ) && (
               <h2
                 className="text-6xl md:text-8xl tracking-tightest leading-none"
                 style={{
