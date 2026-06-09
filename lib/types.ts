@@ -140,6 +140,12 @@ export type GeneratedBrand = {
    * bento panel and on each "in action" playbook page.
    */
   mockupDescriptions?: string[];
+  /**
+   * Four real, generated logo treatments (index order: primary·dark,
+   * inverted·light, accent knockout, monochrome) — distinct recolored
+   * versions of the mark, not the same image on different swatches.
+   */
+  logoVariants?: (string | undefined)[];
   /** Nano Banana 2-generated editorial hero image used as the playbook cover background. */
   coverImageDataUrl?: string;
   /**
@@ -175,6 +181,11 @@ export type GeneratedCampaign = {
    * Shown in the campaign bento hero/lockup and on the playbook cover.
    */
   campaignLogoDataUrl?: string;
+  /**
+   * Four real, generated treatments of the campaign title logo (index order:
+   * primary·dark, inverted·light, accent knockout, monochrome).
+   */
+  logoVariants?: (string | undefined)[];
 };
 
 export type ReasonRequest =
