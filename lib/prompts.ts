@@ -347,3 +347,21 @@ export const campaignLogoImagePrompt = (c: CampaignInput) =>
   }Evocative of: ${
     c.toneKeywords.join(", ") || "bold, contemporary"
   }. Clean, flat, high-contrast, centered, on a plain white or transparent-looking background. No photographic elements, no mascot, no busy background — just the campaign wordmark as a crisp logo.`;
+
+/**
+ * Edit-prompts that turn a base logo (passed as the input image) into four
+ * REAL variant treatments — not the same image re-tinted by CSS. Index order
+ * matches the bento/playbook lockup row: primary·dark, inverted·light,
+ * accent knockout, monochrome.
+ */
+export const logoVariantEditPrompts = (hexes: string[]): string[] => {
+  const c0 = hexes[0] || "#0a0a0a";
+  const c1 = hexes[1] || "#c8ff3e";
+  const c2 = hexes[2] || "#f5f0e8";
+  return [
+    `Take the logo from the provided image and present it UNCHANGED — identical colors, identical proportions — centered with generous clear space on a solid ${c0} background. A clean primary lockup. Output only the logo on the background; no added text, captions, watermarks, or annotations.`,
+    `Take the logo from the provided image and prepare it for LIGHT surfaces: centered with clear space on a solid ${c2} off-white background. If any part of the mark is white or very light and would disappear on this background, render that element in a dark tone for legibility while preserving the exact shapes and proportions. Output only the logo on the background; no added text or annotations.`,
+    `Recreate the logo from the provided image as a clean SINGLE-COLOR knockout: every shape filled solid ${c1} with no gradients, shadows, or interior detail, preserving the exact silhouette and proportions, centered with clear space on a solid ${c0} background. Output only the one-color logo; no added text or annotations.`,
+    `Recreate the logo from the provided image as a MONOCHROME knockout: every shape filled solid white, no gradients or detail, preserving the exact silhouette and proportions, centered with clear space on a solid black background. Output only the white logo on black; no added text or annotations.`,
+  ];
+};
