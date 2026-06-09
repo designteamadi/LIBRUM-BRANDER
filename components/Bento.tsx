@@ -35,6 +35,8 @@ type Props = {
   mockupDescriptions?: string[];
   /** Channel-driven placement descriptors (campaign). */
   placements?: CampaignPlacementTile[];
+  /** Four real generated logo treatments (primary/inverted/accent/mono). */
+  logoVariants?: (string | undefined)[];
   /** Kept for backwards compatibility; pattern visualization removed. */
   patternIdea?: string;
   headlines?: string[];
@@ -80,6 +82,7 @@ export default function Bento(props: Props) {
     mockupImages,
     mockupDescriptions,
     placements,
+    logoVariants,
     headlines,
     cta,
     channelIdeas,
@@ -137,6 +140,11 @@ export default function Bento(props: Props) {
 
   // Accent rotation so panels don't all share one accent.
   const accents = [c1, c3, "#1fc9d7", c2];
+
+  // Real generated logo treatments available? (need all four)
+  const hasLogoVariants =
+    Array.isArray(logoVariants) &&
+    logoVariants.filter(Boolean).length >= 4;
 
   return (
     <>
@@ -347,7 +355,14 @@ export default function Bento(props: Props) {
             </p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 h-[140px]">
-            {kind === "campaign" && campaignLogoDataUrl ? (
+            {hasLogoVariants ? (
+              <>
+                <VariantTile image={logoVariants![0]} label="primary · dark" />
+                <VariantTile image={logoVariants![1]} label="inverted · light" />
+                <VariantTile image={logoVariants![2]} label="accent" />
+                <VariantTile image={logoVariants![3]} label="monochrome" outline />
+              </>
+            ) : kind === "campaign" && campaignLogoDataUrl ? (
               <>
                 <LogoVariant background={c0} accent={c1} logo={campaignLogoDataUrl} label="primary · dark" />
                 <LogoVariant background={c2} accent={c0} logo={campaignLogoDataUrl} label="inverted · light" />
@@ -1009,6 +1024,43 @@ function MockupTile({
         </button>
       )}
     </>
+  );
+}
+
+function VariantTile({
+  image,
+  label,
+  outline,
+}: {
+  image?: string;
+  label: string;
+  outline?: boolean;
+}) {
+  return (
+    <div
+      className="flex flex-col rounded relative overflow-hidden"
+      style={{ border: outline ? "1px dashed #3a3a42" : "1px solid #1f2128" }}
+    >
+      <div className="flex-1 min-h-0 relative bg-[#070707]">
+        {image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={image}
+            alt={`Logo variant — ${label}`}
+            className="absolute inset-0 w-full h-full object-contain"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="font-mono text-[9px] tracking-widest uppercase text-ash opacity-50">
+              generating…
+            </span>
+          </div>
+        )}
+      </div>
+      <p className="font-mono text-[9px] tracking-widest uppercase py-2 text-center text-ash">
+        {label}
+      </p>
+    </div>
   );
 }
 
