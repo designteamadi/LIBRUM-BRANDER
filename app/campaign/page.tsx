@@ -16,7 +16,7 @@ import {
   nonVisualChannels,
   CHANNEL_META,
 } from "@/lib/placements";
-import { campaignLogoImagePrompt } from "@/lib/prompts";
+import { campaignLogoImagePrompt, logoVariantEditPrompts } from "@/lib/prompts";
 import type {
   ColorPalette,
   TypePairing,
@@ -359,7 +359,31 @@ export default function CampaignFlow() {
         return { placement };
       });
 
-      const [personaRes, campaignLogoRes, imgResults] = await Promise.all([
+      // Generate the campaign's OWN title logo first, so its variants can be
+      // derived by editing it. (No compositing for the base mark.)
+      const campaignLogoRes = await buildImageReq(
+        campaignLogoImagePrompt(campaign),
+        "1:1",
+        false
+      );
+      const campaignLogo: string | undefined = campaignLogoRes?.dataUrl;
+
+      // Edit-request helper that feeds a specific image (the campaign logo)
+      // as the input, independent of the parent brand logo used for mockups.
+      const editImageReq = (prompt: string, inputImage?: string) =>
+        fetch("/api/image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt,
+            aspectRatio: "1:1",
+            inputImages: inputImage ? [inputImage] : undefined,
+          }),
+        })
+          .then((r) => r.json())
+          .catch(() => ({ dataUrl: undefined }));
+
+      const [personaRes, imgResults, variantResults] = await Promise.all([
         fetch("/api/reason", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -369,8 +393,6 @@ export default function CampaignFlow() {
             palette: selectedPalette,
           }),
         }),
-        // Campaign's own title logo — no compositing, transparent-ish bg.
-        buildImageReq(campaignLogoImagePrompt(campaign), "1:1", false),
         Promise.all(
           imageTiles.map((t) =>
             buildImageReq(
@@ -380,7 +402,18 @@ export default function CampaignFlow() {
             )
           )
         ),
+        // Four real treatments of the campaign mark (primary/inverted/accent/mono).
+        campaignLogo
+          ? Promise.all(
+              logoVariantEditPrompts(selectedPalette.hexes ?? []).map((p) =>
+                editImageReq(p, campaignLogo)
+              )
+            )
+          : Promise.resolve([] as Array<{ dataUrl?: string }>),
       ]);
+      const logoVariants: (string | undefined)[] = variantResults.map(
+        (r) => r?.dataUrl
+      );
 
       if (!personaRes.ok) {
         throw new Error(`Persona service returned ${personaRes.status}`);
@@ -452,6 +485,7 @@ export default function CampaignFlow() {
         mockupImages,
         placements,
         campaignLogoDataUrl: campaignLogoRes?.dataUrl,
+        logoVariants,
         // coverImageDataUrl is filled in by background generation on /result.
       };
       setGeneratedCampaign(generated);
