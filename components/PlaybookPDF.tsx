@@ -304,6 +304,8 @@ type BrandPlaybookProps = CommonProps & {
   logoDontExamples: (string | undefined)[];
   /** Per-applied-surface case-study copy, index-aligned to mockupImages. */
   mockupDescriptions?: string[];
+  /** Four real generated logo treatments (primary/inverted/accent/mono). */
+  logoVariants?: (string | undefined)[];
 };
 
 type CampaignPlaybookProps = CommonProps & {
@@ -322,6 +324,8 @@ type CampaignPlaybookProps = CommonProps & {
   placements?: CampaignPlacementTile[];
   /** The campaign's own generated title logo (distinct from the brand logo). */
   campaignLogoDataUrl?: string;
+  /** Four real generated treatments of the campaign mark. */
+  logoVariants?: (string | undefined)[];
 };
 
 // ============================================================
@@ -815,6 +819,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
             label="primary · dark"
             caption="default"
             logo={props.logoImageDataUrl}
+            variantImage={props.logoVariants?.[0]}
             accent={c1}
             wordmarkText={props.name}
           />
@@ -823,6 +828,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
             label="inverted · light"
             caption="for light surfaces"
             logo={props.logoImageDataUrl}
+            variantImage={props.logoVariants?.[1]}
             accent={c0}
             wordmarkText={props.name}
           />
@@ -833,6 +839,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
             label="accent"
             caption="for hi-impact moments"
             logo={props.logoImageDataUrl}
+            variantImage={props.logoVariants?.[2]}
             accent={c0}
             wordmarkText={props.name}
           />
@@ -841,6 +848,7 @@ export function BrandPlaybook(props: BrandPlaybookProps) {
             label="monochrome"
             caption="emergency / 1-color use"
             logo={props.logoImageDataUrl}
+            variantImage={props.logoVariants?.[3]}
             accent={c2}
             outline
             wordmarkText={props.name}
@@ -1838,6 +1846,7 @@ function LogoCard({
   outline,
   wordmarkText,
   wordmarkFont,
+  variantImage,
 }: {
   bg: string;
   label: string;
@@ -1849,7 +1858,43 @@ function LogoCard({
   wordmarkText?: string;
   /** Font for the fallback wordmark — usually the chosen display font. */
   wordmarkFont?: string;
+  /** A real generated variant image (with its own baked background). */
+  variantImage?: string;
 }) {
+  // When a real generated treatment exists, show it edge-to-edge (it already
+  // carries its own background and recoloring) with just the label beneath.
+  if (variantImage) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: COLORS.ink,
+          borderWidth: outline ? 0.5 : 0,
+          borderColor: outline ? COLORS.steel : "transparent",
+          borderStyle: outline ? "dashed" : "solid",
+          height: 200,
+          overflow: "hidden",
+        }}
+      >
+        <Image
+          src={variantImage}
+          style={{ width: "100%", height: 168, objectFit: "contain" }}
+        />
+        <Text
+          style={{
+            fontSize: 8,
+            letterSpacing: 1.4,
+            textTransform: "uppercase",
+            color: COLORS.ash,
+            textAlign: "center",
+            paddingTop: 8,
+          }}
+        >
+          {label}
+        </Text>
+      </View>
+    );
+  }
   return (
     <View
       style={{
@@ -1968,7 +2013,7 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
           .filter((m) => Boolean(m.img))
           .slice(0, 6)
           .map((m) => ({ img: m.img, idx: m.idx }));
-  const total = 12 + placementPages.length;
+  const total = 17 + placementPages.length;
 
   return (
     <Document
@@ -2510,13 +2555,190 @@ export function CampaignPlaybook(props: CampaignPlaybookProps) {
         <PageFooter brand={cName} page={11} total={total} />
       </Page>
 
-      {/* ============ 12-13 / VISUALS ============ */}
+      {/* ============ 12 / STRATEGY — THE BIG IDEA ============ */}
+      <Page size="A4" style={styles.page}>
+        <PageHeader brand={cName} section="strategy" pageNum={`12 / ${total}`} />
+        <Text style={styles.sectionLabel}>12 — the big idea</Text>
+        <Text style={styles.sectionTitle}>The strategy.</Text>
+        <Text style={styles.sectionSub}>
+          {props.campaignStory ||
+            props.campaignPurpose ||
+            `How ${cName} earns attention and turns it into action.`}
+        </Text>
+        <View style={{ flexDirection: "row", gap: 14, marginTop: 18 }}>
+          {[
+            { k: "objective", v: props.campaignPurpose || `Move ${props.targetMarket || "the audience"} to act.` },
+            { k: "audience", v: props.targetMarket || "The people most ready to respond." },
+            { k: "promise", v: props.cta || "A single, clear next step." },
+          ].map((col) => (
+            <View
+              key={col.k}
+              style={{ flex: 1, borderTopWidth: 1, borderTopColor: c1, paddingTop: 10 }}
+            >
+              <Text style={{ fontSize: 8, letterSpacing: 1.6, textTransform: "uppercase", color: c1, marginBottom: 6 }}>
+                {col.k}
+              </Text>
+              <Text style={{ fontSize: 11, lineHeight: 1.5, color: COLORS.bone }}>{col.v}</Text>
+            </View>
+          ))}
+        </View>
+        <View style={{ marginTop: 26, backgroundColor: c0, padding: 22 }}>
+          <Text style={{ fontSize: 8, letterSpacing: 1.6, textTransform: "uppercase", color: c1, marginBottom: 8 }}>
+            the mechanic
+          </Text>
+          <Text style={{ fontSize: 13, lineHeight: 1.6, color: COLORS.bone }}>
+            Meet the audience at the exact moment a real doubt surfaces, answer
+            it in their language, and carry them to one decisive action:{" "}
+            <Text style={{ color: c1 }}>{props.cta || "act now"}</Text>. Every
+            placement that follows is the same idea, re-fitted to where it lives.
+          </Text>
+        </View>
+        <PageFooter brand={cName} page={12} total={total} />
+      </Page>
+
+      {/* ============ 13 / CUSTOMER JOURNEY ============ */}
+      <Page size="A4" style={styles.page}>
+        <PageHeader brand={cName} section="journey" pageNum={`13 / ${total}`} />
+        <Text style={styles.sectionLabel}>13 — the funnel</Text>
+        <Text style={styles.sectionTitle}>The journey.</Text>
+        <Text style={styles.sectionSub}>
+          Four stages, each with a job to do and the channels that do it.
+        </Text>
+        <View style={{ marginTop: 16 }}>
+          {[
+            { s: "Awareness", felt: "“I’ve never heard of this.”", job: "Interrupt with the key visual; plant the idea.", ch: "OOH · social · video" },
+            { s: "Consideration", felt: "“Is this for me?”", job: "Answer the doubt; show the proof and the promise.", ch: "web · print · email" },
+            { s: "Conversion", felt: "“Okay — what now?”", job: `Remove friction; one clear CTA — ${props.cta || "act now"}.`, ch: "landing · email · social" },
+            { s: "Loyalty", felt: "“That was worth it.”", job: "Reward the choice; invite them to bring others.", ch: "email · social" },
+          ].map((row, i) => (
+            <View
+              key={row.s}
+              style={{
+                flexDirection: "row",
+                gap: 14,
+                paddingVertical: 12,
+                borderTopWidth: 0.5,
+                borderTopColor: COLORS.steel,
+              }}
+            >
+              <Text style={{ width: 26, fontSize: 18, fontFamily: "Times-Roman", color: c1 }}>
+                {i + 1}
+              </Text>
+              <View style={{ width: 96 }}>
+                <Text style={{ fontSize: 12, fontFamily: "Helvetica-Bold", color: COLORS.bone }}>{row.s}</Text>
+                <Text style={{ fontSize: 9, fontFamily: "Times-Italic", color: COLORS.ash, marginTop: 3 }}>{row.felt}</Text>
+              </View>
+              <Text style={{ flex: 1, fontSize: 10.5, lineHeight: 1.5, color: COLORS.bone }}>{row.job}</Text>
+              <Text style={{ width: 110, fontSize: 8, letterSpacing: 1, textTransform: "uppercase", color: c1, textAlign: "right" }}>
+                {row.ch}
+              </Text>
+            </View>
+          ))}
+        </View>
+        <PageFooter brand={cName} page={13} total={total} />
+      </Page>
+
+      {/* ============ 14 / ROLLOUT — PHASES ============ */}
+      <Page size="A4" style={styles.page}>
+        <PageHeader brand={cName} section="rollout" pageNum={`14 / ${total}`} />
+        <Text style={styles.sectionLabel}>14 — phasing</Text>
+        <Text style={styles.sectionTitle}>The rollout.</Text>
+        <Text style={styles.sectionSub}>
+          A four-beat release so the idea builds instead of burning out on day one.
+        </Text>
+        <View style={{ flexDirection: "row", gap: 10, marginTop: 18 }}>
+          {[
+            { p: "Tease", w: "Week 1", d: "Drop the key visual with no explanation. Provoke the question." },
+            { p: "Launch", w: "Week 2", d: "Reveal the promise across the hero placements; full message live." },
+            { p: "Amplify", w: "Weeks 3–4", d: "Re-cut for each channel; lean into what’s resonating." },
+            { p: "Convert", w: "Weeks 5–6", d: `Retarget the engaged; push the single CTA — ${props.cta || "act now"}.` },
+          ].map((ph, i) => (
+            <View key={ph.p} style={{ flex: 1, backgroundColor: i === 3 ? c1 : c0, padding: 14, minHeight: 150 }}>
+              <Text style={{ fontSize: 8, letterSpacing: 1.4, textTransform: "uppercase", color: i === 3 ? contrastOn(c1) : c1, marginBottom: 6 }}>
+                {ph.w}
+              </Text>
+              <Text style={{ fontSize: 15, fontFamily: "Times-Roman", color: i === 3 ? contrastOn(c1) : COLORS.bone, marginBottom: 8 }}>
+                {ph.p}.
+              </Text>
+              <Text style={{ fontSize: 9.5, lineHeight: 1.45, color: i === 3 ? contrastOn(c1) : COLORS.ash }}>
+                {ph.d}
+              </Text>
+            </View>
+          ))}
+        </View>
+        <PageFooter brand={cName} page={14} total={total} />
+      </Page>
+
+      {/* ============ 15 / MEASUREMENT — KPIs ============ */}
+      <Page size="A4" style={styles.page}>
+        <PageHeader brand={cName} section="measurement" pageNum={`15 / ${total}`} />
+        <Text style={styles.sectionLabel}>15 — success</Text>
+        <Text style={styles.sectionTitle}>How we’ll know it worked.</Text>
+        <Text style={styles.sectionSub}>
+          Each funnel stage gets a number to watch — so the campaign can be
+          steered while it’s live, not just judged after.
+        </Text>
+        <View style={{ marginTop: 16 }}>
+          {[
+            { s: "Awareness", m: "Reach · impressions · video views" },
+            { s: "Consideration", m: "Click-through rate · time on page · saves" },
+            { s: "Conversion", m: "Conversion rate · cost per action · sign-ups" },
+            { s: "Loyalty", m: "Repeat rate · referrals · review volume" },
+          ].map((row) => (
+            <View
+              key={row.s}
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                paddingVertical: 12,
+                borderTopWidth: 0.5,
+                borderTopColor: COLORS.steel,
+              }}
+            >
+              <Text style={{ fontSize: 12, fontFamily: "Helvetica-Bold", color: COLORS.bone }}>{row.s}</Text>
+              <Text style={{ fontSize: 10, color: COLORS.ash }}>{row.m}</Text>
+            </View>
+          ))}
+        </View>
+        <View style={{ marginTop: 22, borderTopWidth: 1, borderTopColor: c1, paddingTop: 10 }}>
+          <Text style={{ fontSize: 8, letterSpacing: 1.6, textTransform: "uppercase", color: c1, marginBottom: 6 }}>
+            north star
+          </Text>
+          <Text style={{ fontSize: 12, lineHeight: 1.5, color: COLORS.bone }}>
+            {props.campaignPurpose
+              ? `The one number that defines success: progress against “${props.campaignPurpose}”.`
+              : "The one number that defines success: completed actions on the primary CTA."}
+          </Text>
+        </View>
+        <PageFooter brand={cName} page={15} total={total} />
+      </Page>
+
+      {/* ============ 16 / CAMPAIGN MARK ============ */}
+      <Page size="A4" style={styles.page}>
+        <PageHeader brand={cName} section="campaign mark" pageNum={`16 / ${total}`} />
+        <Text style={styles.sectionLabel}>16 — variations</Text>
+        <Text style={styles.sectionTitle}>The mark.</Text>
+        <Text style={styles.sectionSub}>
+          Four authorized treatments of the campaign title logo. Pick the one
+          with enough contrast for the surface.
+        </Text>
+        <View style={{ flexDirection: "row", gap: 10, marginTop: 8, marginBottom: 18 }}>
+          <LogoCard bg={c0} label="primary · dark" caption="default" logo={props.campaignLogoDataUrl} variantImage={props.logoVariants?.[0]} accent={c1} wordmarkText={cName} />
+          <LogoCard bg={c2} label="inverted · light" caption="for light surfaces" logo={props.campaignLogoDataUrl} variantImage={props.logoVariants?.[1]} accent={c0} wordmarkText={cName} />
+        </View>
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <LogoCard bg={c1} label="accent" caption="for hi-impact moments" logo={props.campaignLogoDataUrl} variantImage={props.logoVariants?.[2]} accent={c0} wordmarkText={cName} />
+          <LogoCard bg="transparent" label="monochrome" caption="1-color use" logo={props.campaignLogoDataUrl} variantImage={props.logoVariants?.[3]} accent={c2} outline wordmarkText={cName} />
+        </View>
+        <PageFooter brand={cName} page={16} total={total} />
+      </Page>
+
       {/* ============ PLACEMENTS ============
           One page per media placement. Each carries the generated visual (or
           a composed card for radio/email) plus its Location / Context /
           rationale — every page explains where it lives and why. */}
       {placementPages.map((pp, i) => {
-        const pageNo = 12 + i;
+        const pageNo = 17 + i;
         const pl = pp.placement;
         const label = pl?.label ?? `placement ${i + 1}`;
         return (
@@ -2907,6 +3129,7 @@ export function buildBrandPlaybook(g: GeneratedBrand, languageNative: string) {
       coverImageDataUrl={g.coverImageDataUrl}
       logoDontExamples={g.logoDontExamples ?? []}
       mockupDescriptions={g.mockupDescriptions ?? []}
+      logoVariants={g.logoVariants ?? []}
       language={languageNative}
     />
   );
@@ -2941,6 +3164,7 @@ export function buildCampaignPlaybook(
       coverImageDataUrl={g.coverImageDataUrl}
       placements={g.placements}
       campaignLogoDataUrl={g.campaignLogoDataUrl}
+      logoVariants={g.logoVariants ?? []}
       language={languageNative}
     />
   );
