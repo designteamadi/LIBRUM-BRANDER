@@ -423,6 +423,7 @@ Aspect ratio: 3:2 landscape.`;
             mockupDescriptions={g?.mockupDescriptions}
             placements={c?.placements}
             campaignLogoDataUrl={c?.campaignLogoDataUrl}
+            logoVariants={isCampaign ? c?.logoVariants : g?.logoVariants}
             conceptThumbnails={(isCampaign ? c?.palettes : g?.palettes)?.map(
               (p) => p.conceptImageDataUrl
             )}
